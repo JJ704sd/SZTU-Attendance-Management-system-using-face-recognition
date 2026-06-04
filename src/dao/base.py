@@ -16,7 +16,8 @@ class BaseDao(Generic[T]):
         self.s = session
 
     def get(self, pk) -> Optional[T]:
-        return self.s.query(self.model).get(pk)
+        # SQLAlchemy 2.0: Session.get(model, pk) 替代 self.s.query(model).get(pk)
+        return self.s.get(self.model, pk)
 
     def get_all(self) -> List[T]:
         return self.s.query(self.model).all()

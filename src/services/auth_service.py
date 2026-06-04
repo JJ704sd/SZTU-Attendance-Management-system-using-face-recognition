@@ -21,18 +21,9 @@ class AuthError(Exception):
 
 
 class AuthService:
-    def __init__(self, dao: UserDao = None):
-        # 允许注入 dao，便于测试
-        self._dao = dao
-
-    @property
-    def dao(self) -> UserDao:
-        if self._dao is None:
-            # 默认从 session_scope 取
-            # 实际每次新建一个 session 即可（轻量）
-            from src.db import SessionLocal
-            return UserDao(SessionLocal())
-        return self._dao
+    def __init__(self):
+        # 所有方法内部用 session_scope() 自管 session，不需要外部注入
+        pass
 
     # -----------------------------------------------------
     # 注册
