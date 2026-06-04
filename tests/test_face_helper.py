@@ -68,3 +68,14 @@ def test_face_encodings_known_locations_skips_detection():
     # 空白图编码后是 128 维零向量附近的向量
     assert len(encs) == 1
     assert encs[0].shape == (128,)
+
+
+def test_face_encodings_dtype_is_float32():
+    """锁住 dtype=float32：face.py 列注释 + W3 序列化都用 float32"""
+    img = _blank_image()
+    locs = [(10, 100, 110, 20)]
+    encs = face_encodings(img, known_face_locations=locs)
+    assert encs[0].dtype == np.float32, (
+        f"face_helper 必须返回 float32，与 FaceEncoding 列注释一致；"
+        f"当前是 {encs[0].dtype}。改回 float64 会让 W3 序列化/比对量纲不一致。"
+    )

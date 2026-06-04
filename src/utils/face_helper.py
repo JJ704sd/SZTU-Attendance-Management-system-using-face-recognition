@@ -102,7 +102,9 @@ def face_encodings(image_bgr: np.ndarray,
         # 转 dlib.rectangle
         rect = dlib.rectangle(left, top, right, bottom)
         shape = _sp(rgb, rect)               # 68 关键点
-        encoding = np.array(_facerec.compute_face_descriptor(rgb, shape), dtype=np.float64)
+        # 统一用 float32：dlib 内部 compute_face_descriptor 返回的就是 float32，
+        # face.py:16 列注释也写 "128维float32"，避免 W3 序列化/比对时量纲不一致
+        encoding = np.array(_facerec.compute_face_descriptor(rgb, shape), dtype=np.float32)
         encodings.append(encoding)
     return encodings
 

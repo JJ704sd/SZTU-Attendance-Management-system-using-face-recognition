@@ -13,7 +13,7 @@ class FaceEncoding(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     user_id = Column(Integer, ForeignKey("user.id", ondelete="CASCADE"), nullable=False)
-    encoding = Column(LargeBinary, nullable=False, comment="128维float32向量bytes")
+    encoding = Column(LargeBinary, nullable=False, comment="128维float32向量序列化bytes")
     image_path = Column(String(255), nullable=False)
     is_primary = Column(SmallInteger, default=0)
     created_at = Column(DateTime, default=datetime.now)
