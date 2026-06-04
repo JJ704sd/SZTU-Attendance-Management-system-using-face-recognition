@@ -72,6 +72,7 @@ src/
 | **bcrypt 而非明文** | 课程要求"密码不能明文" |
 | **SQLAlchemy 2.0 ORM** | 防 SQL 注入 + 跨数据库可移植（演示可一键切 SQLite） |
 | **PyQt5 而非 Tkinter** | 控件丰富，4 个主窗口有大量表格 + 表单 |
+| **face encoding 统一 float32** | `face_helper.face_encodings` 返回 `np.float32`，与 dlib 内部 + `FaceEncoding.encoding` 列注释一致；W3 序列化/比对链路不会再因量纲不一致出错。**不要改回 float64**，有 `test_face_encodings_dtype_is_float32` 锁住 |
 
 ## 环境陷阱（容易踩的）
 
@@ -83,7 +84,7 @@ src/
   ```bash
   git -c http.proxy= -c https.proxy= push -u origin main
   ```
-- **课程要求 PDF** `2025-2026-2+数据库原理+课程设计要求.pdf` 在仓库根目录，**是参考资料不是项目代码**
+- **课程要求 PDF** `2025-2026-2+数据库原理+课程设计要求.pdf` 仍在项目根目录的磁盘上（是学校发的参考资料），但**已从 git 撤库**（commit `f956163`），`.gitignore` 里 `*.pdf` 规则会拦住
 
 ## 仓库拓扑
 
@@ -92,7 +93,8 @@ src/
 | `src/` | **本项目代码**（4 层架构） |
 | `db/schema.sql` | MySQL DDL（10 张表，utf8mb4） |
 | `docs/` | 设计文档（PROJECT_PLAN / ARCHITECTURE / STRUCTURE / DEVELOPMENT / DATABASE / WORKFLOWS / TEAM_AND_TIMELINE） |
-| `tests/` | 单元测试（17 项，service + util 覆盖） |
+| `docs/superpowers/plans/` | 实施计划（按 writing-plans skill 格式）。当前最新：`2026-06-04-W3-face-recognition.md`（W3 6 阶段计划，估时 4.5 天，截止 2026-06-07） |
+| `tests/` | 单元测试（18/18 全过，0 warning；含 1 项 dtype 回归测试） |
 | `scripts/` | 运维脚本（init_db / run_dev） |
 | `reference/patelrahul4884/` | **原项目参考代码**，**不被 import**，仅作对比 |
 | `models/` | dlib 模型权重（git ignore，运行时下载） |
@@ -109,4 +111,12 @@ src/
 
 ## 当前进度
 
-W2 末。已跑通：登录注册、教师端完整流程、17/17 单测。**未做**：face_service（摄像头采集/训练/识别）、学生端刷脸、学生端历史、实验室管理端、matplotlib 报表、PyInstaller 打包。详细分工见 `docs/TEAM_AND_TIMELINE.md`。
+**W2 末，W3 计划就绪待执行。**
+
+- ✅ 已跑通：登录注册、教师端 4 个 tab 完整流程、10 张表 + 3 角色
+- ✅ 18/18 单测全过，0 warning（commit `241ab3d`）
+- ✅ P0/P1 遗留 bug 全部修完（face_helper dtype / SQLAlchemy 2.0 / 死代码 / PDF 撤库）
+- 📋 W3 详细计划：[`docs/superpowers/plans/2026-06-04-W3-face-recognition.md`](docs/superpowers/plans/2026-06-04-W3-face-recognition.md)，按 Phase 1→6 顺序执行
+- ❌ 未做：face_service + CameraWidget（Phase 1-2）、学生端刷脸注册/签到/历史（Phase 3-5）、实验室管理端 + 报表（W4）、PyInstaller（W5）、报告 PPT（W6）
+
+详细分工见 `docs/TEAM_AND_TIMELINE.md`。
