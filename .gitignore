@@ -1,0 +1,64 @@
+# =====================================================
+# 智能考勤与实验室准入系统 — .gitignore
+# =====================================================
+
+# ---------- 敏感配置 ----------
+.env
+*.env.local
+
+# ---------- Python 缓存 ----------
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+.eggs/
+
+# ---------- 虚拟环境 ----------
+venv/
+.venv/
+env/
+ENV/
+.conda/
+
+# ---------- 测试 / 覆盖率 ----------
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.mypy_cache/
+.ruff_cache/
+
+# ---------- IDE / 编辑器 ----------
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# ---------- dlib 模型权重（运行时由 ensure_models 下载） ----------
+models/*.dat
+models/*.dat.bz2
+
+# ---------- 人脸采集数据集 ----------
+dataset/
+*.jpg
+*.jpeg
+*.png
+!docs/**/*.png
+!docs/**/*.jpg
+!README.md
+!src/assets/**
+
+# ---------- PyInstaller 产物 ----------
+build/
+dist/
+*.spec
+
+# ---------- 日志 ----------
+*.log
+logs/
