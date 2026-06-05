@@ -8,6 +8,7 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtGui import QFont
 
 from src.models.user import User
+from src.ui.styles import welcome_suffix
 
 log = logging.getLogger(__name__)
 
@@ -23,7 +24,7 @@ class StudentWindow(QWidget):
         self.resize(820, 560)
 
         top = QHBoxLayout()
-        welcome = QLabel(f"欢迎，{self.user.real_name} 同学")
+        welcome = QLabel(f"欢迎，{self.user.real_name}{welcome_suffix(self.user)}")
         f = QFont(); f.setPointSize(12); f.setBold(True)
         welcome.setFont(f)
         top.addWidget(welcome)

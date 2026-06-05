@@ -19,7 +19,7 @@ CREATE TABLE user (
     real_name     VARCHAR(50) NOT NULL COMMENT '真实姓名',
     role          ENUM('student','teacher','lab_admin') NOT NULL COMMENT '角色',
     student_id    VARCHAR(20) UNIQUE COMMENT '学号（学生专用）',
-    direction     VARCHAR(50) COMMENT '专业方向：纳米医学技术/生物医学仪器/生物医学检测/智能医疗仪器/智能医疗信息',
+    direction     VARCHAR(50) COMMENT '专业方向：纳米医学技术/生物医学仪器/生物医学检测/智能医疗仪器/智能医疗信息/智能医学工程',
     email         VARCHAR(100),
     phone         VARCHAR(20),
     avatar_path   VARCHAR(255) COMMENT '头像路径',

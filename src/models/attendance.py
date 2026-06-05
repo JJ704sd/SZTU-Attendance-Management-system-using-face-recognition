@@ -3,10 +3,9 @@ models/attendance.py — 考勤任务、记录、请假
 """
 from datetime import datetime
 from sqlalchemy import (
-    Column, Integer, String, Float, DateTime, Text, SmallInteger,
+    Column, Integer, String, Float, DateTime, Text,
     ForeignKey, Enum, UniqueConstraint,
 )
-from sqlalchemy.orm import relationship
 
 from src.db import Base
 

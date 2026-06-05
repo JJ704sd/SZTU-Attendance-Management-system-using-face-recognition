@@ -6,7 +6,7 @@ from PyQt5.QtWidgets import (
     QDialog, QFormLayout, QComboBox, QDateTimeEdit, QDialogButtonBox,
     QMessageBox, QVBoxLayout, QLabel,
 )
-from PyQt5.QtCore import QDateTime, Qt
+from PyQt5.QtCore import QDateTime
 
 from src.db import session_scope
 from src.dao.course_dao import CourseDao

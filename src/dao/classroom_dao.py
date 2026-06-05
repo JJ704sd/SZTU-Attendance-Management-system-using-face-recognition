@@ -2,7 +2,6 @@
 dao/classroom_dao.py — 教室 DAO
 """
 from typing import List
-from sqlalchemy.orm import Session
 
 from src.dao.base import BaseDao
 from src.models.course import Classroom

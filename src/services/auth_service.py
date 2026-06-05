@@ -4,14 +4,12 @@ services/auth_service.py — 认证服务
 - 登录：bcrypt 校验、返回 User 对象
 - 退出：清空 session（在 UI 层做）
 """
-from typing import Optional, Tuple
 import re
 
 from src.dao.user_dao import UserDao
 from src.db import session_scope
 from src.models.user import User
 from src.utils.crypto import hash_password, verify_password
-from src.config import Config
 
 USERNAME_RE = re.compile(r"^[A-Za-z0-9_]{3,50}$")
 

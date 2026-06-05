@@ -5,7 +5,6 @@ tests/test_face_helper.py — face_helper 单元测试
 不依赖数据库，需要 dlib 模型文件已下载到 models/
 """
 import numpy as np
-import pytest
 
 from src.utils.face_helper import (
     face_locations, face_encodings, face_distance, compare_faces,

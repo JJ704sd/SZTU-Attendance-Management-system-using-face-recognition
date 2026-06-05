@@ -2,7 +2,6 @@
 dao/course_dao.py — 课程 DAO
 """
 from typing import List, Optional
-from sqlalchemy.orm import Session
 
 from src.dao.base import BaseDao
 from src.models.course import Course

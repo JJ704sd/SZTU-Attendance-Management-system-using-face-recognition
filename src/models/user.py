@@ -3,7 +3,6 @@ models/user.py — 用户表模型
 """
 from datetime import datetime
 from sqlalchemy import Column, Integer, String, Enum, DateTime, SmallInteger
-from sqlalchemy.orm import relationship
 
 from src.db import Base
 

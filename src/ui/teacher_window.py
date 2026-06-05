@@ -7,7 +7,6 @@ ui/teacher_window.py — 教师端主窗口
 - 账号：显示当前用户信息 + 修改密码
 """
 import logging
-from datetime import datetime
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QTabWidget,
     QTableWidget, QTableWidgetItem, QMessageBox, QHeaderView, QAbstractItemView,
@@ -17,12 +16,13 @@ from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QFont
 
 from src.db import session_scope
-from src.dao.attendance_dao import AttendanceTaskDao, AttendanceRecordDao
+from src.dao.attendance_dao import AttendanceTaskDao
 from src.dao.course_dao import CourseDao
 from src.dao.classroom_dao import ClassroomDao
 from src.services.attendance_service import AttendanceService
 from src.services.auth_service import AuthService, AuthError
 from src.models.user import User
+from src.ui.styles import welcome_suffix
 
 log = logging.getLogger(__name__)
 
@@ -40,7 +40,7 @@ class TeacherWindow(QWidget):
 
         # 顶部
         top = QHBoxLayout()
-        welcome = QLabel(f"欢迎，{self.user.real_name} 老师")
+        welcome = QLabel(f"欢迎，{self.user.real_name}{welcome_suffix(self.user)}")
         welcome_font = QFont()
         welcome_font.setPointSize(12)
         welcome_font.setBold(True)

@@ -15,6 +15,7 @@ from PyQt5.QtWidgets import QApplication, QMessageBox
 
 from src.db import init_db
 from src.ui.login_window import LoginWindow
+from src.ui.styles import apply_global_style
 from src.config import Config
 
 logging.basicConfig(
@@ -42,6 +43,7 @@ def main():
     app = QApplication(sys.argv)
     app.setApplicationName("智能考勤与实验室准入系统")
     app.setStyle("Fusion")
+    apply_global_style(app)
 
     # 3. 登录窗口
     login = LoginWindow()

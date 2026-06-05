@@ -1,9 +1,7 @@
 """
 dao/attendance_dao.py — 考勤相关 DAO
 """
-from datetime import datetime
 from typing import List, Optional
-from sqlalchemy.orm import Session
 from sqlalchemy import and_, desc
 
 from src.dao.base import BaseDao

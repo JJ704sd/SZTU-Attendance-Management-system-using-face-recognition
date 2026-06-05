@@ -7,9 +7,6 @@ from typing import Optional
 from sqlalchemy import and_
 
 from src.db import session_scope
-from src.dao.attendance_dao import AttendanceTaskDao, AttendanceRecordDao
-from src.dao.user_dao import UserDao
-from src.dao.course_dao import CourseDao
 from src.models.attendance import AttendanceTask, AttendanceRecord, LeaveRequest
 from src.models.user import User
 

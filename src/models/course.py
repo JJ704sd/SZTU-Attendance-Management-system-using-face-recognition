@@ -1,9 +1,7 @@
 """
 models/course.py — 课程 & 教室 & 实验室
 """
-from datetime import datetime
-from sqlalchemy import Column, Integer, String, Float, DateTime, SmallInteger, ForeignKey, Enum
-from sqlalchemy.orm import relationship
+from sqlalchemy import Column, Integer, String, Float, SmallInteger, ForeignKey, Enum
 
 from src.db import Base
 

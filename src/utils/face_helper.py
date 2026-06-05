@@ -4,7 +4,6 @@ utils/face_helper.py — 人脸检测与编码工具
 原因：face_recognition 1.3.0 在 Windows + Python 3.13 上有 cmake 编码编译坑，
 dlib-bin 20.0.1 已经装好（cp313 wheel），所以直接用 dlib。
 """
-import os
 import bz2
 import urllib.request
 from pathlib import Path
@@ -33,7 +32,7 @@ def _download_and_decompress(url: str, target: Path):
     if not target.exists():
         print(f"[INFO] Downloading {url} -> {target.name}")
         urllib.request.urlretrieve(url, bz2_path)
-        print(f"[INFO] Decompressing ...")
+        print("[INFO] Decompressing ...")
         with bz2.open(bz2_path, "rb") as src, open(target, "wb") as dst:
             dst.write(src.read())
         bz2_path.unlink()

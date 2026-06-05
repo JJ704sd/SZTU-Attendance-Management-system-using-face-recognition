@@ -2,7 +2,6 @@
 dao/user_dao.py — 用户 DAO
 """
 from typing import Optional
-from sqlalchemy.orm import Session
 
 from src.dao.base import BaseDao
 from src.models.user import User

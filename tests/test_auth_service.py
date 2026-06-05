@@ -3,7 +3,6 @@ tests/test_auth_service.py — AuthService 单元测试
 - 需要 MySQL 服务可用且 .env 中 DB 配置正确
 - 每个测试用独立 username 避免冲突
 """
-import os
 import uuid
 
 import pytest
