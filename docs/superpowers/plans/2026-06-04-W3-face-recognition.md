@@ -35,21 +35,21 @@
 
 ## 阶段划分
 
-### Phase 1：基础层（0.5 天）
+### Phase 1：基础层（0.5 天） ✅ 已完成
 
-- [ ] **新建 `src/dao/face_dao.py`**
+- [x] **新建 `src/dao/face_dao.py`**
   - `find_by_user(user_id) -> list[FaceEncoding]`
   - `delete_by_user(user_id) -> int`（返回删除行数）
   - `set_primary(encoding_id, user_id) -> None`（先把同用户其他行的 `is_primary` 置 0，再设本行 1）
-- [ ] **新建 `src/services/face_service.py`**
-  - 模块级常量 `ENCODING_DIM = 128`、`ENCODING_DTYPE = np.float64`
+- [x] **新建 `src/services/face_service.py`**
+  - 模块级常量 `ENCODING_DIM = 128`、`ENCODING_DTYPE = np.float32`（与 `models/face.py` 注释及 `face_helper.face_encodings` 输出一致；CLAUDE.md 技术决策已锁）
   - `encode_to_bytes(arr: np.ndarray) -> bytes`：用 `arr.astype(np.float32).tobytes()`
   - `decode_from_bytes(b: bytes) -> np.ndarray`：反向
   - `save_encoding(user_id, encoding, image_path, is_primary=False) -> int`（用 `encode_to_bytes` 序列化）
   - `load_user_encodings(user_id) -> list[np.ndarray]`（用 `decode_from_bytes` 反序列化）
   - `load_all_user_encodings() -> dict[int, list[np.ndarray]]`（一次拉所有，识别缓存用）
   - `delete_user_encodings(user_id) -> int`
-- [ ] **`src/models/face.py` 加 `to_dict()`**：`{"id", "user_id", "image_path", "is_primary", "created_at"}`
+- [ ] **`src/models/face.py` 加 `to_dict()`**：`{"id", "user_id", "image_path", "is_primary", "created_at"}`（Phase 4 一起做，与缓存调试合用）
 
 **验收命令：**
 ```bash
@@ -61,15 +61,15 @@ pytest tests/test_face_service.py::test_set_primary -v
 
 ---
 
-### Phase 2：摄像头封装（1 天）
+### Phase 2：摄像头封装（1 天） ✅ 已完成
 
-- [ ] **新建 `src/ui/widgets/camera_widget.py` `CameraWidget(QWidget)`**
+- [x] **新建 `src/ui/widgets/camera_widget.py` `CameraWidget(QWidget)`**
   - 内部持 `cv2.VideoCapture`
   - `QTimer(self)` 设 30 ms 间隔，每 tick 拉一帧 → 转 `QImage`（`cv2.cvtColor(bgr, COLOR_BGR2RGB)` + `QImage.rgbSwapped`）→ 缩放贴 `QLabel`
   - 信号 `frame_ready = pyqtSignal(np.ndarray)`（把 BGR 帧发给上层做检测）
   - 方法 `start(device_id: int = 0) -> bool`（打不开返回 False + 在 widget 上盖红色 "摄像头不可用"）
   - 方法 `stop()`
-  - 方法 `capture_one_frame() -> np.ndarray | None`
+  - 方法 `capture_one_frame() -> np.ndarray | None`（带 `_lock` 互斥，避免与 timer 抢帧）
   - `closeEvent` 调 `stop()`，`__del__` 兜底 `self._cap.release()`
   - 不在本阶段做**人脸框叠加**（留给 Phase 5 一起做）
 
@@ -84,14 +84,14 @@ pytest tests/test_face_service.py::test_set_primary -v
 
 ---
 
-### Phase 3：采集 service（0.5 天）
+### Phase 3：采集 service（0.5 天） ✅ 已完成
 
-- [ ] **在 `src/services/face_service.py` 加：**
+- [x] **在 `src/services/face_service.py` 加：**
   ```python
   def collect_for_user(
       user_id: int,
       camera: "CameraWidget",
-      n_samples: int = 30,
+      n_samples: int = None,  # None 时回退 Config.FACE_SAMPLE_COUNT
       on_progress: Optional[Callable[[int, int], None]] = None,  # (captured, target)
   ) -> dict:
       """
@@ -99,14 +99,16 @@ pytest tests/test_face_service.py::test_set_primary -v
       返回: {"ok": bool, "captured": int, "saved": int, "error": str|None}
       """
   ```
-  - 循环：`frame = camera.capture_one_frame()` → `face_locations` → 0 张则 `continue` → ≥1 张取第 0 张 → `face_encodings` 算 128 维
+  - 循环：`frame = camera.capture_one_frame()` → `face_locations` → 0 张则计数 + continue → ≥1 张 → `face_encodings` 算 128 维（也可能返回 []，同样计数）
   - 原图存到 `Config.DATASET_DIR / f"{user_id}" / f"{idx:03d}.jpg"`（`cv2.imwrite`）
   - 调 `save_encoding()` 写 DB
-  - 触发 `on_progress(captured, n_samples)`（UI 用这个更新进度条）
-  - 中途连续 30 帧无脸 → 返回 `{"ok": False, "error": "采集超时：30 帧未检测到人脸"}`
-  - 异常路径：摄像头断开 → `{"ok": False, "error": "摄像头断开"}`；磁盘满 → `{"ok": False, "error": "磁盘写入失败"}`
+  - 触发 `on_progress(captured, n_samples)`（UI 用这个更新进度条）；回调异常吞掉，不中断采集
+  - 中途连续 `NO_FACE_LIMIT=30` 次未拿到可入库样本（**无帧 / 无脸 / 无编码三选一**）→ 返回 `{"ok": False, "error": "采集超时：连续 30 帧未获取到人脸样本"}`
+    - **回归保护**：`test_collect_for_user_terminates_when_encodings_empty` 锁住，防止重现"face_encodings 持续返回 [] → 死循环"的历史 bug
+  - 异常路径：摄像头断开 → `{"ok": False, "error": "摄像头断开"}`；磁盘写入失败 → `{"ok": False, "error": "磁盘写入失败: ..."}`
 
-- [ ] **加单测 `test_collect_for_user_writes_encodings`**：mock `CameraWidget.capture_one_frame` 返回固定帧（带人脸的 numpy），断言 DB 行数 + 文件数
+- [x] **加单测 `test_collect_for_user_writes_encodings`**：mock `CameraWidget` + patch `face_locations`/`face_encodings`，断言返回值 / DB 行数 / 文件数 / 进度回调次数 / 摄像头调用次数
+- [x] **加回归单测 `test_collect_for_user_terminates_when_encodings_empty`**：用 `threading.Thread + join(10s)` 兜底，确认 face_encodings 持续返空时仍能超时退出
 
 **验收命令：**
 ```bash

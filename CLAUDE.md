@@ -94,7 +94,7 @@ src/
 | `db/schema.sql` | MySQL DDL（10 张表，utf8mb4） |
 | `docs/` | 设计文档（PROJECT_PLAN / ARCHITECTURE / STRUCTURE / DEVELOPMENT / DATABASE / WORKFLOWS / TEAM_AND_TIMELINE） |
 | `docs/superpowers/plans/` | 实施计划（按 writing-plans skill 格式）。当前最新：`2026-06-04-W3-face-recognition.md`（W3 6 阶段计划，估时 4.5 天，截止 2026-06-07） |
-| `tests/` | 单元测试（18/18 全过，0 warning；含 1 项 dtype 回归测试） |
+| `tests/` | 单元测试（25/25 全过，0 warning；含 1 项 dtype 回归 + 1 项 collect_for_user 死循环回归） |
 | `scripts/` | 运维脚本（init_db / run_dev） |
 | `reference/patelrahul4884/` | **原项目参考代码**，**不被 import**，仅作对比 |
 | `models/` | dlib 模型权重（git ignore，运行时下载） |
@@ -111,12 +111,20 @@ src/
 
 ## 当前进度
 
-**W2 末，W3 计划就绪待执行。**
+**W3 Phase 1-3 完成，Phase 4-6 待执行。**
 
-- ✅ 已跑通：登录注册、教师端 4 个 tab 完整流程、10 张表 + 3 角色
-- ✅ 18/18 单测全过，0 warning（commit `241ab3d`）
-- ✅ P0/P1 遗留 bug 全部修完（face_helper dtype / SQLAlchemy 2.0 / 死代码 / PDF 撤库）
-- 📋 W3 详细计划：[`docs/superpowers/plans/2026-06-04-W3-face-recognition.md`](docs/superpowers/plans/2026-06-04-W3-face-recognition.md)，按 Phase 1→6 顺序执行
-- ❌ 未做：face_service + CameraWidget（Phase 1-2）、学生端刷脸注册/签到/历史（Phase 3-5）、实验室管理端 + 报表（W4）、PyInstaller（W5）、报告 PPT（W6）
+- ✅ W2 末：登录注册、教师端 4 个 tab 完整流程、10 张表 + 3 角色
+- ✅ UI 美化：新增 `src/ui/styles.py` 全局 QSS（深藏青色 + 主按钮 + 状态标签），登录/注册/学生/教师窗均已套样式
+- ✅ W3 Phase 1：`src/dao/face_dao.py` + `src/services/face_service.py`（编码序列化 / 单条 CRUD / 全量加载）
+- ✅ W3 Phase 2：`src/ui/widgets/camera_widget.py`（cv2 + QTimer 30ms + `capture_one_frame` 带锁）
+- ✅ W3 Phase 3：`face_service.collect_for_user` 采集编排（连续无脸超时退出 + 进度回调 + 落盘+入库）
+- ✅ 25/25 单测全过，0 warning；新增 `tests/test_face_service.py`（7 项，含死循环回归）
+- ✅ P0/P1 遗留 bug 全部修完：
+  - face_helper dtype 锁 float32（`test_face_encodings_dtype_is_float32`）
+  - SQLAlchemy 2.0 兼容
+  - `welcome_suffix` 修复"测试同学 同学"/"老师 老师"重复后缀
+  - `collect_for_user` 死循环（face_encodings 返回 [] 时不计数）→ 已改为 `consecutive_no_progress` 三种失败模式都计数
+- 📋 W3 详细计划：[`docs/superpowers/plans/2026-06-04-W3-face-recognition.md`](docs/superpowers/plans/2026-06-04-W3-face-recognition.md)
+- ❌ 待做：W3 Phase 4（recognize service + `_FaceCache`）、Phase 5（学生端 3 tab 重写）、Phase 6（smoke_face.py + E2E 文档）；W4（实验室管理 + 报表）；W5（PyInstaller）；W6（报告 PPT）
 
 详细分工见 `docs/TEAM_AND_TIMELINE.md`。
