@@ -23,6 +23,7 @@ COLOR_BG_CARD = "#FFFFFF"     # 卡片/输入框
 COLOR_BORDER = "#CBD5E1"
 COLOR_BORDER_FOCUS = "#2563EB"
 COLOR_DANGER = "#DC2626"
+COLOR_WARNING = "#D97706"     # 橙（介于 success 和 danger 之间）
 COLOR_SUCCESS = "#16A34A"
 
 # ---------- 字体 ----------

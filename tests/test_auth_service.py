@@ -82,8 +82,14 @@ def test_login_wrong_password(auth: AuthService):
 
 
 def test_login_nonexistent_user(auth: AuthService):
+    """用 UUID 随机用户名避免 LOGIN_MAX_ATTEMPTS 锁定污染（Phase 3a 之后）。
+
+    之前用硬编码 "nonexistent_user_xx"，5 次失败后该用户名被永久锁，
+    后面的测试查同一个用户名会抛锁定异常而非"用户名或密码错误" → 失败。
+    """
+    username = _uni("nonexistent")
     with pytest.raises(AuthError, match="用户名或密码错误"):
-        auth.login("nonexistent_user_xx", "123456")
+        auth.login(username, "123456")
 
 
 def test_change_password_success(auth: AuthService):
