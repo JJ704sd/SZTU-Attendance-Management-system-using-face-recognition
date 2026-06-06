@@ -508,17 +508,27 @@ class StudentWindow(QWidget):
             self._refresh_my_leaves()
 
     # ==================================================================
-    # 退出登录
+    # 退出登录 / 关闭窗口
     # ==================================================================
+    def _cleanup_resources(self):
+        """释放摄像头 + 签到 timer (closeEvent + _on_logout 都会调)."""
+        if self._signing_in:
+            self._on_stop_signin()
+        if self.register_camera.is_running():
+            self.register_camera.stop()
+        if self.signin_camera.is_running():
+            self.signin_camera.stop()
+
+    def closeEvent(self, event):
+        """用户点 X 关窗时自动调用, 避免摄像头/timer 资源泄漏."""
+        self._cleanup_resources()
+        super().closeEvent(event)
+
     def _on_logout(self):
         ret = QMessageBox.question(self, "确认", "确定要退出登录吗？",
                                    QMessageBox.Yes | QMessageBox.No)
         if ret == QMessageBox.Yes:
-            # 停掉签到 timer + 摄像头
-            if self._signing_in:
-                self._on_stop_signin()
-            self.register_camera.stop()
-            self.signin_camera.stop()
+            self._cleanup_resources()
             # 回登录窗
             from src.ui.login_window import LoginWindow
             self.login_win = LoginWindow()

@@ -75,6 +75,14 @@ class AdminWindow(QWidget):
         main.addWidget(self.tabs)
         self.setLayout(main)
 
+    def closeEvent(self, event):
+        """用户点 X 关窗时调用, 关闭可能打开的弹窗 (matplotlib canvas 等)."""
+        for attr in ("task_detail_win", "lab_edit_win", "training_edit_win", "log_filter_win"):
+            win = getattr(self, attr, None)
+            if win is not None and hasattr(win, "close"):
+                win.close()
+        super().closeEvent(event)
+
     def _on_logout(self):
         ret = QMessageBox.question(self, "确认", "确定要退出登录吗？",
                                    QMessageBox.Yes | QMessageBox.No)

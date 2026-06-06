@@ -1,159 +1,194 @@
 # 数据库设计
 
-## 11 张表概览
+> W2 初始 10 张表 + W4 加 2 张 (course_enrollment + login_attempt) = **12 张表**
 
-| 表 | 域 | 说明 |
+## 1. 12 张表概览
+
+| 表 | 阶段 | 说明 |
 |---|---|---|
-| `user` | 用户域 | 三类角色统一表，role 字段区分 |
-| `face_encoding` | 人脸域 | 128 维向量 BLOB 存储 |
-| `course` | 课程域 | 区分理论/实验课 |
-| `classroom` | 教室域 | 普通教室，含摄像头标志 |
-| `laboratory` | 实验室域 | 5 级安全等级 |
-| `attendance_task` | 考勤域 | 教师发起的考勤任务 |
-| `attendance_record` | 考勤域 | 学生签到记录 |
-| `leave_request` | 考勤域 | 请假申请与审批 |
-| `lab_training` | 安全培训域 | 学生安全培训记录与有效期 |
-| `lab_access_log` | 安全准入域 | 准入日志（通过/拒绝及原因） |
-| （可选）`direction_dict` | 字典域 | 5 个专业方向枚举 |
+| `user` | W2 | 三类角色统一表, role 字段区分 |
+| `face_encoding` | W2 | 人脸编码, 128 维向量 BLOB 存储 |
+| `course` | W2 | 课程表, 区分理论/实验 |
+| `classroom` | W2 | 教室表, 含摄像头标志 |
+| `laboratory` | W2 | 实验室表, 5 级安全等级 |
+| `attendance_task` | W2 | 考勤任务表 |
+| `attendance_record` | W2 | 考勤记录表 |
+| `leave_request` | W2 (W6 接入) | 请假申请表 |
+| `lab_training` | W2 (W3 接入) | 安全培训记录 |
+| `lab_access_log` | W2 (W3 接入) | 准入日志 |
+| `course_enrollment` | **W4 加** | 选课名单 (替代 close_task fallback 走"role=student 全部") |
+| `login_attempt` | **W4 加** | 登录失败记录 (LOGIN_MAX_ATTEMPTS 防暴力) |
 
-## ER 图
+## 2. ER 图
 
 ```mermaid
 erDiagram
-    USER ||--o{ FACE_ENCODING : "拥有"
-    USER ||--o{ ATTENDANCE_RECORD : "产生"
-    USER ||--o{ LEAVE_REQUEST : "发起"
-    USER ||--o{ LAB_TRAINING : "完成"
-    USER ||--o{ LAB_ACCESS_LOG : "产生"
-    COURSE ||--o{ ATTENDANCE_TASK : "包含"
-    COURSE }o--|| USER : "授课教师"
-    ATTENDANCE_TASK ||--o{ ATTENDANCE_RECORD : "产生"
-    ATTENDANCE_TASK ||--o{ LEAVE_REQUEST : "关联"
-    CLASSROOM ||--o{ ATTENDANCE_TASK : "使用"
-    LABORATORY ||--o{ LAB_TRAINING : "要求"
-    LABORATORY ||--o{ LAB_ACCESS_LOG : "被访问"
-    LABORATORY }o--|| USER : "管理员"
+    user ||--o{ face_encoding : "1:N"
+    user ||--o{ attendance_record : "student_id"
+    user ||--o{ leave_request : "student_id"
+    user ||--o{ lab_training : "student_id"
+    user ||--o{ lab_access_log : "student_id"
+    user ||--o{ course_enrollment : "student_id"
+    user ||--o{ login_attempt : "username"
+    user ||--o{ attendance_task : "teacher_id"
+    user ||--o{ lab_training : "instructor_id"
+    user ||--o{ leave_request : "approver_id"
+    user ||--o{ lab_access_log : "approver_id"
 
-    USER {
-        int id PK
-        varchar username UK
-        varchar password_hash
-        varchar real_name
-        enum role "student/teacher/lab_admin"
-        varchar student_id UK "学号,学生专用"
-        varchar direction "专业方向"
-        varchar email
-        varchar phone
-        datetime created_at
-    }
-    FACE_ENCODING {
-        int id PK
-        int user_id FK
-        blob encoding "128维float32向量"
-        varchar image_path
-        datetime created_at
-    }
-    COURSE {
-        int id PK
-        varchar course_code UK
-        varchar course_name
-        enum course_type "theory/experiment"
-        int teacher_id FK
-        float credit
-    }
-    CLASSROOM {
-        int id PK
-        varchar name
-        varchar location
-        int capacity
-        tinyint has_camera
-    }
-    LABORATORY {
-        int id PK
-        varchar name
-        varchar location
-        tinyint safety_level "1-5"
-        int manager_id FK
-    }
-    ATTENDANCE_TASK {
-        int id PK
-        int course_id FK
-        int teacher_id FK
-        int classroom_id FK
-        datetime start_time
-        datetime end_time
-        enum status "open/closed"
-    }
-    ATTENDANCE_RECORD {
-        int id PK
-        int task_id FK
-        int student_id FK
-        datetime sign_in_time
-        enum status "present/late/absent/leave"
-        float match_score
-    }
-    LEAVE_REQUEST {
-        int id PK
-        int student_id FK
-        int task_id FK
-        text reason
-        enum status "pending/approved/rejected"
-        int approver_id FK
-    }
-    LAB_TRAINING {
-        int id PK
-        int student_id FK
-        int lab_id FK
-        enum training_type "生物/化学/辐射/设备"
-        date completion_date
-        date expiry_date
-        float score
-    }
-    LAB_ACCESS_LOG {
-        int id PK
-        int student_id FK
-        int lab_id FK
-        datetime access_time
-        tinyint granted "1放行/0拒绝"
-        varchar reason
-    }
+    course ||--o{ course_enrollment : "1:N"
+    course ||--o{ attendance_task : "1:N"
+    classroom ||--o{ attendance_task : "1:N"
+    attendance_task ||--o{ attendance_record : "1:N"
+    attendance_task ||--o{ leave_request : "1:N"
+
+    laboratory ||--o{ lab_training : "1:N"
+    laboratory ||--o{ lab_access_log : "1:N"
 ```
 
-## 关键设计决策
+## 3. 关键表结构
 
-### Q1：为什么人脸向量存 BLOB，不存 JSON / 文件？
-- 128 个 float32 序列化为 bytes = 512 字节
-- JSON 至少 1.5KB，且解析开销大
-- 文件方式（每人一文件）难做数据库 JOIN 查询统计
-- BLOB 可与 user 表做 JOIN，方便查"哪些用户已注册人脸"
+### user (用户表, 三类角色统一)
 
-### Q2：为什么 user 表不拆成 student / teacher / lab_admin 三张表？
-- 三类用户字段高度重叠（username、password_hash、real_name、email、phone）
-- 拆表带来多表 JOIN 复杂度上升，登录认证要 IF/CASE 分支
-- 用 role ENUM + 学生专用字段 `student_id`、`direction` 兜底
-- 演示和讲解更清晰
+```sql
+CREATE TABLE user (
+    id            INT PRIMARY KEY AUTO_INCREMENT,
+    username      VARCHAR(50) UNIQUE NOT NULL,
+    password_hash VARCHAR(255) NOT NULL,  -- bcrypt $2b$12$...
+    real_name     VARCHAR(50) NOT NULL,
+    role          ENUM('student', 'teacher', 'lab_admin') NOT NULL,
+    student_id    VARCHAR(20) UNIQUE,     -- 学生专用
+    direction     VARCHAR(50),            -- 专业方向
+    email         VARCHAR(100),
+    phone         VARCHAR(20),
+    avatar_path   VARCHAR(255),
+    is_active     SMALLINT DEFAULT 1,     -- 0=禁用
+    created_at    DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at    DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+```
 
-### Q3：为什么 attendance_record 用独立表而不是 JSON 字段存到 task 表？
-- 考勤记录是核心查询对象（学生查个人、班级查整体）
-- 频繁 UPDATE / INSERT，独立表性能与维护性更好
-- 满足数据库原理课程对**第三范式**的展示
+**角色**:
+- `student`: 刷脸签到 / 请假 / 实验室准入
+- `teacher`: 发起考勤 / 审批请假 / 查报表
+- `lab_admin`: 实验室管理 / 培训管理 / 准入日志 / 报表
 
-### Q4：专业方向为什么不单独建 direction 表？
-- 5 个方向固定，频次低
-- 用 VARCHAR + 应用层校验已经足够
-- 强行建字典表会显得**过度设计**
+### face_encoding (人脸编码)
 
-## 完整 DDL
+```sql
+CREATE TABLE face_encoding (
+    id          INT PRIMARY KEY AUTO_INCREMENT,
+    user_id     INT NOT NULL,
+    encoding    LONGBLOB NOT NULL,        -- 128 维 float32 序列化 (512 字节)
+    image_path  VARCHAR(255) NOT NULL,
+    is_primary  SMALLINT DEFAULT 0,       -- 1 = 主编码
+    created_at  DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES user(id) ON DELETE CASCADE
+);
+```
 
-见 [../db/schema.sql](../db/schema.sql)，可直接 `mysql -u root -p < db/schema.sql` 执行。
+**W3 关键决策**: encoding 统一用 **float32** 序列化 (`encode_to_bytes(arr.tobytes())`),
+避免 numpy 2.x 默认 float64 与 dlib 内部 float32 量纲不一致。
 
-## 关键索引
+### attendance_record (考勤记录)
 
-| 索引 | 表 | 用途 |
-|---|---|---|
-| `idx_role` | user | 角色筛选（管理员查所有教师） |
-| `idx_student_id` | user | 学号登录 |
-| `idx_user` | face_encoding | 某用户所有人脸编码 |
-| `idx_task_student` | attendance_record | 防重复 + 学生查个人 |
-| `idx_student_lab` | lab_training | 准入核验核心查询 |
-| `idx_access_time` | lab_access_log | 日志倒序 |
+```sql
+CREATE TABLE attendance_record (
+    id            INT PRIMARY KEY AUTO_INCREMENT,
+    task_id       INT NOT NULL,
+    student_id    INT NOT NULL,
+    sign_in_time  DATETIME,
+    status        ENUM('present', 'late', 'absent', 'leave') DEFAULT 'absent',
+    match_score   FLOAT,                  -- 0-1, sign_in_by_face 传入
+    face_image    VARCHAR(255),
+    created_at    DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_task_student (task_id, student_id),  -- 同一任务同一学生唯一
+    FOREIGN KEY (task_id) REFERENCES attendance_task(id) ON DELETE CASCADE,
+    FOREIGN KEY (student_id) REFERENCES user(id)
+);
+```
+
+**W6 关键修复**: `sign_in_by_face` 验证 user 存在 + 角色是 student,
+避免 ghost user_id 抛 FK 1452 错误。
+
+### lab_access_log (准入日志)
+
+```sql
+CREATE TABLE lab_access_log (
+    id          INT PRIMARY KEY AUTO_INCREMENT,
+    student_id  INT,                      -- 准入者 (可能是 teacher/admin)
+    lab_id      INT NOT NULL,
+    access_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+    granted     SMALLINT NOT NULL,        -- 1=放行 / 0=拒绝
+    reason      VARCHAR(255),
+    face_image  VARCHAR(255),
+    FOREIGN KEY (student_id) REFERENCES user(id),
+    FOREIGN KEY (lab_id) REFERENCES laboratory(id)
+);
+```
+
+**W7 关键修复**: `find_by_lab` / `find_by_student` 加 `desc(id)` 作 tie-breaker,
+MySQL `DATETIME` 默认精度只到秒, 同秒插入的多条记录排序稳定。
+
+### course_enrollment (选课名单, W4 加)
+
+```sql
+CREATE TABLE course_enrollment (
+    id         INT PRIMARY KEY AUTO_INCREMENT,
+    course_id  INT NOT NULL,
+    student_id INT NOT NULL,
+    enrolled_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_course_student (course_id, student_id),
+    FOREIGN KEY (course_id) REFERENCES course(id) ON DELETE CASCADE,
+    FOREIGN KEY (student_id) REFERENCES user(id)
+);
+```
+
+**W4 关键改造**: `close_task_and_mark_absent` 用 `course_enrollment` 查学生名单,
+替代原来 fallback 到"role=student 全部"的逻辑 (避免把不相关的学生标缺勤)。
+
+### login_attempt (登录失败记录, W4 加)
+
+```sql
+CREATE TABLE login_attempt (
+    id         INT PRIMARY KEY AUTO_INCREMENT,
+    username   VARCHAR(50) NOT NULL,
+    success    SMALLINT NOT NULL,        -- 1=成功 / 0=失败
+    attempted_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_username_time (username, attempted_at)
+);
+```
+
+**W4 防暴力**: `auth_service.login` 登录失败时记 attempt;
+登录前查最近 `LOGIN_MAX_ATTEMPTS`(默认 5) 次失败次数, 超阈值抛 `账号已锁定`。
+
+## 4. 12 张表汇总 (CHARACTER SET utf8mb4)
+
+```
+1.  user (W2)
+2.  face_encoding (W2)
+3.  course (W2)
+4.  classroom (W2)
+5.  laboratory (W2)
+6.  attendance_task (W2)
+7.  attendance_record (W2)
+8.  leave_request (W2, W6 接入)
+9.  lab_training (W2, W3 接入)
+10. lab_access_log (W2, W3 接入)
+11. course_enrollment (W4 新)
+12. login_attempt (W4 新)
+```
+
+DDL 完整源码: [`db/schema.sql`](../db/schema.sql)
+
+## 5. ORM 模型 (src/models/)
+
+每个表对应一个 SQLAlchemy model, `Base.metadata.create_all(engine)` 自动建表:
+- `user.py` (User)
+- `face.py` (FaceEncoding)
+- `course.py` (Classroom, Course, Laboratory)
+- `attendance.py` (AttendanceTask, AttendanceRecord, LeaveRequest)
+- `lab.py` (LabTraining, LabAccessLog)
+- `course_enrollment.py` (CourseEnrollment, W4 加)
+- `login_attempt.py` (LoginAttempt, W4 加)
+
+**一致性**: schema 12 张 ↔ model 12 个 — 全部对应, W8 二次审计确认。

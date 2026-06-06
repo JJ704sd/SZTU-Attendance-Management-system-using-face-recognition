@@ -292,8 +292,17 @@ class TeacherWindow(QWidget):
             QMessageBox.warning(self, "失败", str(e))
 
     # =====================================================
-    # 退出登录
+    # 退出登录 / 关闭窗口
     # =====================================================
+    def closeEvent(self, event):
+        """用户点 X 关窗时调用, 关闭可能打开的弹窗避免悬挂引用."""
+        # 关闭可能打开的请假审批弹窗 (W6 Phase 1 加的)
+        for attr in ("leave_review_win", "task_detail_win", "new_pwd_win"):
+            win = getattr(self, attr, None)
+            if win is not None and hasattr(win, "close"):
+                win.close()
+        super().closeEvent(event)
+
     def _on_logout(self):
         ret = QMessageBox.question(self, "确认", "确定要退出登录吗？",
                                    QMessageBox.Yes | QMessageBox.No)
