@@ -14,10 +14,10 @@ class LabTraining(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     student_id = Column(Integer, ForeignKey("user.id"), nullable=False)
     lab_id = Column(Integer, ForeignKey("laboratory.id"), nullable=False)
-    training_type = Column(
-        Enum("生物", "化学", "辐射", "设备", name="training_type"),
-        nullable=False,
-    )
+    # MySQL 端是 ENUM('生物','化学','辐射','设备')；这里用 String 让 SQLAlchemy
+    # 写入走 utf8mb4 字符串路径（绕开 SQLAlchemy Enum 类型的 charset 映射问题）。
+    # MySQL 自动 cast String 到 ENUM。
+    training_type = Column(String(20), nullable=False)
     completion_date = Column(Date, nullable=False)
     expiry_date = Column(Date, nullable=False)
     score = Column(Float, nullable=False)
