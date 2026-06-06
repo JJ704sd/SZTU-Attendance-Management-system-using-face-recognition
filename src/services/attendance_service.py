@@ -142,11 +142,8 @@ class AttendanceService:
     def task_summary(self, task_id: int) -> dict:
         """返回某个任务的统计：present/late/absent/leave 各多少人"""
         with session_scope() as s:
-            from collections import Counter
-            rows = s.query(AttendanceRecord.status).filter(
-                AttendanceRecord.task_id == task_id
-            ).all()
-            counter = Counter(r[0] for r in rows)
+            from src.dao.attendance_dao import AttendanceRecordDao
+            counter = AttendanceRecordDao(s).count_by_status(task_id)
             return {
                 "present": counter.get("present", 0),
                 "late": counter.get("late", 0),

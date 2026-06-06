@@ -12,7 +12,7 @@ class AttendanceTaskDao(BaseDao[AttendanceTask]):
     model = AttendanceTask
 
     def find_by_id(self, task_id: int) -> Optional[AttendanceTask]:
-        return self.s.query(AttendanceTask).get(task_id)
+        return self.s.get(AttendanceTask, task_id)
 
     def find_by_teacher(self, teacher_id: int) -> List[AttendanceTask]:
         return self.s.query(AttendanceTask).filter(
