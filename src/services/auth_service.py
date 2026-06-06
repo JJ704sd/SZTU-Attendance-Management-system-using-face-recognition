@@ -1,12 +1,14 @@
 """
 services/auth_service.py — 认证服务
 - 注册：用户名唯一、密码 bcrypt、role 校验
-- 登录：bcrypt 校验、返回 User 对象
+- 登录：bcrypt 校验、返回 User 对象；W4 加 LOGIN_MAX_ATTEMPTS 防暴力破解
 - 退出：清空 session（在 UI 层做）
 """
 import re
 
+from src.config import Config
 from src.constants import ROLE_STUDENT, VALID_ROLES
+from src.dao.login_attempt_dao import LoginAttemptDao
 from src.dao.user_dao import UserDao
 from src.db import session_scope
 from src.models.user import User
@@ -73,16 +75,48 @@ class AuthService:
     # 登录
     # -----------------------------------------------------
     def login(self, username: str, password: str) -> User:
-        """成功返回 User，失败抛 AuthError"""
+        """成功返回 User，失败抛 AuthError。
+
+        W4 Phase 3a: 加 LOGIN_MAX_ATTEMPTS 防暴力破解。
+        流程:
+        1. 查最近 LOGIN_MAX_ATTEMPTS 次失败次数
+        2. >= 阈值 → 直接抛 AuthError("账号已锁定")
+        3. 校验密码
+        4. 成功 → record_attempt(success=True) + 返回
+        5. 失败 → record_attempt(success=False) + 抛 AuthError
+
+        ⚠️ 关键: 失败分支在 raise 之前必须显式 s.commit()，否则 session_scope
+        退出时的 rollback 会把 record_attempt 一起回滚，导致锁定永远不触发。
+        """
         with session_scope() as s:
-            dao = UserDao(s)
-            user = dao.find_by_username(username)
+            attempt_dao = LoginAttemptDao(s)
+            # 1. 检查是否已锁定
+            recent_failures = attempt_dao.count_recent_failures(
+                username, limit=Config.LOGIN_MAX_ATTEMPTS,
+            )
+            if recent_failures >= Config.LOGIN_MAX_ATTEMPTS:
+                raise AuthError(
+                    f"账号已锁定：连续 {Config.LOGIN_MAX_ATTEMPTS} 次登录失败，"
+                    f"请联系管理员解锁"
+                )
+
+            # 2-3. 校验密码
+            user_dao = UserDao(s)
+            user = user_dao.find_by_username(username)
             if not user:
+                attempt_dao.record_attempt(username, success=False)
+                s.commit()  # 显式提交，避免 raise 触发 rollback 抹掉记录
                 raise AuthError("用户名或密码错误")
             if user.is_active != 1:
+                # 禁用账号不记录为"失败"（避免永久锁定），但仍抛错
                 raise AuthError("账号已被禁用")
             if not verify_password(password, user.password_hash):
+                attempt_dao.record_attempt(username, success=False)
+                s.commit()  # 同上
                 raise AuthError("用户名或密码错误")
+
+            # 4. 成功
+            attempt_dao.record_attempt(username, success=True)
             s.expunge(user)
             return user
 

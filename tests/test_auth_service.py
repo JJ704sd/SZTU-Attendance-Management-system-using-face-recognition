@@ -106,3 +106,83 @@ def test_change_password_wrong_old(auth: AuthService):
                          role="student", student_id=_uni("s"))
     with pytest.raises(AuthError, match="原密码错误"):
         auth.change_password(user.id, "wrongold", "newpass123")
+
+
+# -----------------------------------------------------
+# W4 Phase 3a: LOGIN_MAX_ATTEMPTS 锁定
+# -----------------------------------------------------
+def test_login_lockout_after_max_attempts(auth: AuthService):
+    """连续 LOGIN_MAX_ATTEMPTS 次失败后，第 N+1 次抛锁定异常。"""
+    from src.config import Config
+    from src.dao.login_attempt_dao import LoginAttemptDao
+    from src.db import session_scope
+
+    username = _uni("locked")
+    auth.register(username=username, password="123456", real_name="锁定测试",
+                  role="student", student_id=_uni("s"))
+
+    # 失败 LOGIN_MAX_ATTEMPTS 次
+    for _ in range(Config.LOGIN_MAX_ATTEMPTS):
+        with pytest.raises(AuthError, match="用户名或密码错误"):
+            auth.login(username, "wrongpass")
+
+    # 第 N+1 次：即使密码对，也应抛锁定
+    with pytest.raises(AuthError, match="锁定"):
+        auth.login(username, "123456")
+
+    # 清理
+    with session_scope() as s:
+        LoginAttemptDao(s).clear_attempts(username)
+
+
+def test_login_successful_attempt_resets_failure_count(auth: AuthService):
+    """成功 1 次后，之前失败次数应被"冲淡"（不影响锁定判断）。"""
+    from src.config import Config
+    from src.dao.login_attempt_dao import LoginAttemptDao
+    from src.db import session_scope
+
+    username = _uni("reset")
+    auth.register(username=username, password="123456", real_name="重置测试",
+                  role="student", student_id=_uni("s"))
+
+    # 失败 4 次 + 成功 1 次
+    for _ in range(Config.LOGIN_MAX_ATTEMPTS - 1):
+        with pytest.raises(AuthError):
+            auth.login(username, "wrongpass")
+    logged = auth.login(username, "123456")
+    assert logged.username == username
+
+    # 再失败 4 次（不超阈值）应该仍然允许试
+    for _ in range(Config.LOGIN_MAX_ATTEMPTS - 1):
+        with pytest.raises(AuthError, match="用户名或密码错误"):
+            auth.login(username, "wrongpass")
+
+    # 清理
+    with session_scope() as s:
+        LoginAttemptDao(s).clear_attempts(username)
+
+
+def test_login_lockout_unlocks_after_clear(auth: AuthService):
+    """清空 attempt 后（管理员解锁），又能登录。"""
+    from src.config import Config
+    from src.dao.login_attempt_dao import LoginAttemptDao
+    from src.db import session_scope
+
+    username = _uni("unlock")
+    auth.register(username=username, password="123456", real_name="解锁测试",
+                  role="student", student_id=_uni("s"))
+
+    # 触发锁定
+    for _ in range(Config.LOGIN_MAX_ATTEMPTS):
+        with pytest.raises(AuthError):
+            auth.login(username, "wrongpass")
+    with pytest.raises(AuthError, match="锁定"):
+        auth.login(username, "123456")
+
+    # 管理员清空 attempt
+    with session_scope() as s:
+        LoginAttemptDao(s).clear_attempts(username)
+
+    # 又能登录
+    logged = auth.login(username, "123456")
+    assert logged.username == username
