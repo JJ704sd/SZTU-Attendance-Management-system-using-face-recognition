@@ -56,13 +56,12 @@ class CreateTaskDialog(QDialog):
             self.room_combo.addItem(f"{r.name}（{r.location or '—'}）", r.id)
         form.addRow("教室*:", self.room_combo)
 
-        # 时间
+        # 时间 (默认 now + 45 min)
         now = datetime.now()
-        self.start_edit = QDateTimeEdit(QDateTime.currentDateTime())
+        self.start_edit = QDateTimeEdit(QDateTime.fromString(
+            now.strftime("%Y-%m-%d %H:%M"), "yyyy-MM-dd HH:mm"))
         self.start_edit.setDisplayFormat("yyyy-MM-dd HH:mm")
         self.start_edit.setCalendarPopup(True)
-        self.start_edit.setDateTime(QDateTime.fromString(
-            now.strftime("%Y-%m-%d %H:%M"), "yyyy-MM-dd HH:mm"))
 
         self.end_edit = QDateTimeEdit(QDateTime.currentDateTime().addSecs(45 * 60))
         self.end_edit.setDisplayFormat("yyyy-MM-dd HH:mm")

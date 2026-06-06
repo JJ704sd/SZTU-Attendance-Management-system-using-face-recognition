@@ -230,7 +230,12 @@ class FaceCollectDialog(QDialog):
         if result.get("ok"):
             self._set_status(f"完成！共采集 {self.saved_count} 张", state="success")
             self._refresh_button_state()
-            # 不立即 accept；让用户看完进度再点取消关闭
+            # W8 修复: 1.5s 后自动 accept, 让 student_window 看到成功
+            # (之前注释说"不立即 accept, 让用户看完进度" 是反 UX:
+            #  状态栏/进度条已经能告诉用户结果, 关 dialog 后 student_window
+            #  不刷新注册状态, 学生不知道采集成功)
+            from PyQt5.QtCore import QTimer
+            QTimer.singleShot(1500, self.accept)
         else:
             err = result.get("error", "未知错误")
             if err == "用户取消":

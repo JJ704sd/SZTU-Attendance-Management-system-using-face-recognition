@@ -13,8 +13,12 @@ Phase 5 增强：
 - set_overlay_callback(callable) 注册每帧叠加回调（画人脸框、调试信息等）；
   默认 None，不破坏现有用法。回调签名 (bgr: np.ndarray) -> np.ndarray，
   返回处理后的 BGR（异常会被吞掉，避免中断预览）。
+
+W8 三次审计: _lock 从 bool 改为 threading.Lock (cv2.VideoCapture 不是线程安全,
+  FaceCollectDialog worker 在子线程调 capture_one_frame, 主线程 QTimer 也在调)
 """
 import logging
+import threading
 from typing import Callable, Optional
 
 import cv2
@@ -33,7 +37,9 @@ class CameraWidget(QWidget):
         super().__init__(parent)
         self._cap: cv2.VideoCapture | None = None
         self._timer: QTimer | None = None
-        self._lock = False  # 简易并发保险：capture_one_frame 与 _on_tick 互斥
+        # W8 修复: 用 threading.Lock 替代 bool (cv2.VideoCapture 不是线程安全,
+        # 主线程 QTimer + 子线程 QThread 都会调 capture_one_frame)
+        self._lock = threading.Lock()
         self._overlay_callback: Optional[Callable[[np.ndarray], np.ndarray]] = None
         self._init_ui()
 
@@ -84,17 +90,19 @@ class CameraWidget(QWidget):
 
     def capture_one_frame(self) -> np.ndarray | None:
         """同步抓一帧（BGR）。Phase 3 collect_for_user 在工作线程里调。
-        与 _on_tick 互斥，避免 cv2.VideoCapture 并发读帧。"""
+        与 _on_tick 互斥，避免 cv2.VideoCapture 并发读帧。
+        W8 修复: 用 threading.Lock (非 bool) 保证多线程原子.
+        """
         if self._cap is None or not self._cap.isOpened():
             return None
-        if self._lock:
+        if not self._lock.acquire(blocking=False):
+            # 别人正在读, 直接返 None (主线程 30ms 后会再来, 子线程下次循环也会再来)
             return None
-        self._lock = True
         try:
             ok, frame = self._cap.read()
             return frame if ok else None
         finally:
-            self._lock = False
+            self._lock.release()
 
     def is_running(self) -> bool:
         return self._cap is not None and self._cap.isOpened()

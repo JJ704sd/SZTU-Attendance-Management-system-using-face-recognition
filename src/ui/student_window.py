@@ -468,6 +468,12 @@ class StudentWindow(QWidget):
         return bgr
 
     def _open_camera(self, camera: CameraWidget, btn: QPushButton):
+        # W8 修复: 避免两个 CameraWidget 同时打开 device_id=0 冲突
+        # (cv2.VideoCapture 同一 device 只能一个 handle, 后开的前面就废了)
+        if camera is self.register_camera and self.signin_camera.is_running():
+            self.signin_camera.stop()
+        elif camera is self.signin_camera and self.register_camera.is_running():
+            self.register_camera.stop()
         if camera.start(0):
             btn.setText("关闭摄像头")
             try:

@@ -13,8 +13,6 @@ engine = create_engine(
     echo=False,
     pool_pre_ping=True,
     pool_recycle=3600,
-    # W5 调试: 临时开 echo 看 create_all 跑到哪
-    # echo=True,
 )
 
 SessionLocal = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)

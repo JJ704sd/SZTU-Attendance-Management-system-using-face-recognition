@@ -15,7 +15,6 @@ from PyQt5.QtWidgets import (
     QWidget,
 )
 
-from src.dao.lab_access_log_dao import LabAccessLogDao
 from src.dao.lab_dao import LabDao
 from src.dao.user_dao import UserDao
 from src.db import session_scope
