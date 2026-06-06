@@ -6,7 +6,7 @@ Phase 3 范围：collect_for_user 采集编排（dlib 检测 + 落盘 + 入库�
 Phase 4 会再加：内存缓存 _FaceCache + recognize()。
 """
 import logging
-from typing import Callable, Dict, List, Optional, TYPE_CHECKING
+from typing import Callable, Dict, List, Optional, Tuple, TYPE_CHECKING
 
 import cv2
 import numpy as np
@@ -15,7 +15,7 @@ from src.config import Config
 from src.dao.face_dao import FaceEncodingDao
 from src.db import session_scope
 from src.models.face import FaceEncoding
-from src.utils.face_helper import face_encodings, face_locations
+from src.utils.face_helper import face_distance, face_encodings, face_locations
 
 if TYPE_CHECKING:
     from src.ui.widgets.camera_widget import CameraWidget
@@ -109,10 +109,15 @@ class FaceService:
         camera: "CameraWidget",
         n_samples: int = None,
         on_progress: Optional[Callable[[int, int], None]] = None,
+        cache: Optional["_FaceCache"] = None,
     ) -> dict:
         """
         从 camera 抓 n_samples 张人脸图，编码后入库。
         返回: {"ok": bool, "captured": int, "saved": int, "error": str|None}
+
+        cache: 可选；传入 _FaceCache.get() 时会在保存编码后增量更新缓存。
+               传 None 时不更新缓存（默认；测试场景避免污染单例）。
+               UI 层（Phase 5）应传 cache=_FaceCache.get()。
 
         ⚠️ 调用方必须在 Qt 工作线程里调（避免阻塞 UI），
         on_progress 回调里如果直接 setText/setValue 会段错误，
@@ -179,6 +184,10 @@ class FaceService:
                 return {"ok": False, "captured": captured, "saved": saved,
                         "error": f"数据库写入失败: {e}"}
 
+            # 2.5) 增量更新缓存（如有）
+            if cache is not None:
+                cache.add(user_id, encs[0])
+
             captured += 1
             saved += 1
             consecutive_no_progress = 0
@@ -189,3 +198,74 @@ class FaceService:
                     log.exception("on_progress 回调异常（吞掉，避免中断采集）")
 
         return {"ok": True, "captured": captured, "saved": saved, "error": None}
+
+
+# =====================================================
+# Phase 4：进程内识别缓存 + recognize()
+# =====================================================
+class _FaceCache:
+    """
+    进程内单例，启动时全量加载，采集时增量加。
+    演示场景下 N<1000，dict 读写在 CPython GIL 下基本安全；
+    生产环境 > 1k 用户应换 Redis。
+    """
+    _instance: Optional["_FaceCache"] = None
+
+    def __init__(self):
+        self._encodings: Dict[int, List[np.ndarray]] = {}
+
+    @classmethod
+    def get(cls) -> "_FaceCache":
+        if cls._instance is None:
+            cls._instance = cls()
+        return cls._instance
+
+    @classmethod
+    def reset_for_test(cls) -> None:
+        """测试辅助：清空单例。生产代码不要调。"""
+        cls._instance = None
+
+    def refresh(self) -> None:
+        """全量重建。从 DB 拉所有 {user_id: [encodings]}。"""
+        self._encodings = FaceService().load_all_user_encodings()
+
+    def add(self, user_id: int, encoding: np.ndarray) -> None:
+        self._encodings.setdefault(user_id, []).append(encoding)
+
+    def remove_user(self, user_id: int) -> None:
+        self._encodings.pop(user_id, None)
+
+    def all(self) -> Dict[int, List[np.ndarray]]:
+        return self._encodings
+
+
+def recognize(encoding: np.ndarray,
+              cache: Optional[_FaceCache] = None) -> Optional[Tuple[int, float]]:
+    """
+    在 cache 中找最近用户，距离 ≤ 阈值算命中。
+    返回 (user_id, distance) 或 None（空缓存 / 全员超阈值）。
+
+    cache: 可选；传 None 时用 _FaceCache.get() 单例。测试时传 mock cache。
+    """
+    if cache is None:
+        cache = _FaceCache.get()
+
+    encodings_map = cache.all()
+    if not encodings_map:
+        log.warning("recognize: 缓存为空（库中可能还没有任何人脸编码）")
+        return None
+
+    best_user: Optional[int] = None
+    best_dist = float("inf")
+    for user_id, encs in encodings_map.items():
+        if not encs:
+            continue
+        dists = face_distance(encs, encoding)
+        d = float(dists.min())
+        if d < best_dist:
+            best_dist = d
+            best_user = user_id
+
+    if best_user is None or best_dist > Config.FACE_MATCH_THRESHOLD:
+        return None
+    return best_user, best_dist

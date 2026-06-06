@@ -14,8 +14,10 @@ from src.config import Config
 from src.services.auth_service import AuthService
 from src.services.face_service import (
     FaceService,
+    _FaceCache,
     encode_to_bytes,
     decode_from_bytes,
+    recognize,
     ENCODING_DIM,
 )
 
@@ -220,3 +222,65 @@ def test_collect_for_user_terminates_when_encodings_empty(face: FaceService, tes
     finally:
         if user_dir.exists():
             user_dir.rmdir()
+
+
+# -----------------------------------------------------
+# 7. recognize() — Phase 4 识别入口
+#    用 mock cache 注入测试数据，避免污染 _FaceCache 单例
+# -----------------------------------------------------
+class _MockCache:
+    """满足 _FaceCache.all() 接口的最小 mock；测试时直接传进 recognize()."""
+    def __init__(self, data: dict):
+        self._data = data
+
+    def all(self) -> dict:
+        return self._data
+
+
+def test_recognize_returns_user_id():
+    """cache 注入 {1: [zeros128]}，传 zeros128 + 0.01 → 命中 (1, ~0.01)"""
+    zeros = np.zeros(ENCODING_DIM, dtype=np.float32)
+    cache = _MockCache({1: [zeros]})
+    near = zeros + 0.01  # 距离 ≈ sqrt(128 * 0.01^2) ≈ 0.113
+
+    user_id, dist = recognize(near, cache=cache)
+
+    assert user_id == 1
+    assert dist == pytest.approx(0.113, rel=0.05)
+
+
+def test_recognize_returns_none_below_threshold():
+    """cache 注入 {1: [zeros128]}，传 zeros128 + 1.0 → 距离 ~11.3 超阈值 0.45 → None"""
+    zeros = np.zeros(ENCODING_DIM, dtype=np.float32)
+    cache = _MockCache({1: [zeros]})
+    far = zeros + 1.0  # 距离 ≈ sqrt(128) ≈ 11.31
+
+    assert recognize(far, cache=cache) is None
+
+
+def test_recognize_empty_cache():
+    """空 cache → None（库中没编码）"""
+    cache = _MockCache({})
+    query = np.zeros(ENCODING_DIM, dtype=np.float32)
+
+    assert recognize(query, cache=cache) is None
+
+
+def test_recognize_takes_min_distance_per_user():
+    """多用户场景：每个用户多张编码，取最小距离；最终取全用户中最近的。"""
+    zeros = np.zeros(ENCODING_DIM, dtype=np.float32)
+    # user 1 有一张很近的编码；user 2 的两张都很远
+    near_for_u1 = zeros + 0.05
+    far_for_u2_a = zeros + 0.5
+    far_for_u2_b = zeros + 0.6
+    cache = _MockCache({
+        1: [near_for_u1],
+        2: [far_for_u2_a, far_for_u2_b],
+    })
+
+    # 查询 zeros + 0.06：到 u1 每维差 0.01 → 距离 0.01*sqrt(128) ≈ 0.113
+    # 到 u2 每维差 ≥ 0.44 → 距离 ≥ 0.44*sqrt(128) ≈ 4.98（远超阈值）
+    query = zeros + 0.06
+    user_id, dist = recognize(query, cache=cache)
+    assert user_id == 1
+    assert dist == pytest.approx(0.01 * np.sqrt(128), rel=0.05)

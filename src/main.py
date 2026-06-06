@@ -39,6 +39,16 @@ def main():
         )
         sys.exit(1)
 
+    # 1.5. 人脸编码缓存预热（避免首次识别冷启动拉全表）
+    # 失败不挂：缓存空只是首次识别慢一点，登录/UI 都不受影响。
+    try:
+        from src.services.face_service import _FaceCache
+        _FaceCache.get().refresh()
+        n_users = len(_FaceCache.get().all())
+        log.info(f"人脸编码缓存预热完成：{n_users} 个用户")
+    except Exception as e:
+        log.warning(f"人脸编码缓存预热失败：{e}（首次识别时会冷启动）")
+
     # 2. 启动 Qt
     app = QApplication(sys.argv)
     app.setApplicationName("智能考勤与实验室准入系统")
