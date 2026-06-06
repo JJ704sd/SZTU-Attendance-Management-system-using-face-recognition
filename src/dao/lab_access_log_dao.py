@@ -20,8 +20,12 @@ class LabAccessLogDao(BaseDao[LabAccessLog]):
 
     def log_attempt(self, lab_id: int, granted: bool, reason: str = None,
                     student_id: Optional[int] = None,
-                    face_image: Optional[str] = None) -> int:
-        """记一次准入尝试，返回新行 id。"""
+                    face_image: Optional[str] = None,
+                    access_time: Optional[datetime] = None) -> int:
+        """记一次准入尝试，返回新行 id。
+
+        access_time: 可选；不传则用 LabAccessLog.access_time 的 default (datetime.now)。
+        传了则用传入的时间（测试场景需要控时间用）。"""
         row = LabAccessLog(
             student_id=student_id,
             lab_id=lab_id,
@@ -29,6 +33,8 @@ class LabAccessLogDao(BaseDao[LabAccessLog]):
             reason=reason,
             face_image=face_image,
         )
+        if access_time is not None:
+            row.access_time = access_time
         self.s.add(row)
         self.s.flush()
         return row.id
