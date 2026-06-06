@@ -2,15 +2,12 @@
 """
 build.spec — 智能考勤与实验室准入系统 打包配置
 
-W5 Phase 1 验收目标:
-- onedir 模式（不是 onefile）
-- console=False（GUI 应用，无控制台）
-- 隐藏 import 显式列（PyInstaller 默认扫描 + hiddenimports 兜底）
-- --collect-all PyQt5（platforms/plugins 自动包含）
+W5 Phase 2 升级: 路径兼容 (src.utils.paths) + post-build 拷 models/
 
 构建: pyinstaller build.spec
-产物: dist/attendance-system/attendance-system.exe
+产物: dist/attendance-system/attendance-system.exe + 同级 models/ + .env (运行时配置)
 """
+import shutil
 import sys
 from pathlib import Path
 
@@ -24,19 +21,18 @@ hiddenimports = [
     'pymysql.connections',
     # C 扩展
     'bcrypt',
-    '_bcrypt',
     # matplotlib PyQt5 backend
     'matplotlib.backends.backend_qt5agg',
     'matplotlib.backends.backend_qt5',
-    # 项目内 import 兜底（防止 _FaceCache 等私有类漏掉）
+    # 项目内 module 兜底（防 dynamic import 漏掉）
     'src.services.face_service',
-    'src.services.face_service._FaceCache',
     'src.services.lab_access_service',
     'src.services.report_service',
     'src.services.auth_service',
     'src.services.attendance_service',
     'src.utils.face_helper',
     'src.utils.charts',
+    'src.utils.paths',
     'src.dao.face_dao',
     'src.dao.lab_dao',
     'src.dao.lab_training_dao',
@@ -117,3 +113,30 @@ coll = COLLECT(
     upx_exclude=[],
     name='attendance-system',
 )
+
+# =====================================================
+# W5 Phase 2: post-build 把 models/ 拷到 dist 同级
+# 让 dist/attendance-system/ 拿到即可直接运行
+# （首次启动 ensure_models() 仍会检查 + 必要时下载）
+# =====================================================
+_DIST = Path('dist') / 'attendance-system'
+_MODELS_SRC = Path('models')
+if _MODELS_SRC.exists() and _DIST.exists():
+    _DEST = _DIST / 'models'
+    _DEST.mkdir(exist_ok=True)
+    for f in _MODELS_SRC.glob('*.dat'):
+        target = _DEST / f.name
+        if not target.exists():
+            shutil.copy2(f, target)
+            print(f"[post-build] copied {f.name} -> {target}")
+    print(f"[post-build] models dir ready at {_DEST}")
+else:
+    print(f"[post-build] SKIP: models src={_MODELS_SRC.exists()}, dist={_DIST.exists()}")
+
+# W5 Phase 2: 拷 .env.template (用户自己复制改名 .env)
+_ENV_TPL = Path('.env.template')
+if _ENV_TPL.exists() and _DIST.exists():
+    shutil.copy2(_ENV_TPL, _DIST / '.env.template')
+    print(f"[post-build] copied .env.template -> {_DIST / '.env.template'}")
+else:
+    print(f"[post-build] SKIP: .env.template exists={_ENV_TPL.exists()}, dist={_DIST.exists()}")

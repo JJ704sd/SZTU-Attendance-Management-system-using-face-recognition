@@ -3,6 +3,8 @@ utils/face_helper.py — 人脸检测与编码工具
 基于 dlib + opencv，自行实现 face_recognition 风格的 4 个核心函数
 原因：face_recognition 1.3.0 在 Windows + Python 3.13 上有 cmake 编码编译坑，
 dlib-bin 20.0.1 已经装好（cp313 wheel），所以直接用 dlib。
+
+W5 改动：路径走 src.utils.paths 单例（兼容 PyInstaller 打包）
 """
 import bz2
 import urllib.request
@@ -13,8 +15,9 @@ import cv2
 import numpy as np
 import dlib
 
-# 模型权重放到项目 models/ 目录（不入 git）
-MODELS_DIR = Path(__file__).resolve().parent.parent.parent / "models"
+# 路径单例：dev 是项目根，打包后是 exe 同级目录
+from src.utils.paths import APP_ROOT, MODELS_DIR, DATASET_DIR  # noqa: F401
+
 SHAPE_PREDICTOR_URL = (
     "https://github.com/davisking/dlib-models/raw/master/"
     "shape_predictor_68_face_landmarks.dat.bz2"

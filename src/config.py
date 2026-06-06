@@ -1,13 +1,17 @@
 """
 config.py — 全局配置
 从 .env 读取数据库连接等敏感信息，提供统一访问入口。
+
+W5 改动: PROJECT_ROOT 走 src.utils.paths.APP_ROOT 单例，
+兼容 PyInstaller 打包后 .env 必须在 exe 同级目录。
 """
 import os
-from pathlib import Path
 from dotenv import load_dotenv
 
-# 加载 .env（项目根目录）
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
+from src.utils.paths import APP_ROOT
+
+# 加载 .env（dev: 项目根；打包后: exe 同级目录）
+PROJECT_ROOT = APP_ROOT
 load_dotenv(PROJECT_ROOT / ".env")
 
 
@@ -32,6 +36,7 @@ class Config:
     # 人脸识别
     FACE_MATCH_THRESHOLD = float(os.getenv("FACE_MATCH_THRESHOLD", "0.45"))
     FACE_SAMPLE_COUNT = int(os.getenv("FACE_SAMPLE_COUNT", "30"))
+    # dataset 走 src.utils.paths.DATASET_DIR 单例
     DATASET_DIR = PROJECT_ROOT / "dataset" / "face_images"
 
     # 安全

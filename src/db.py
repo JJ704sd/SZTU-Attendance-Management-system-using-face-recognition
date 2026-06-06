@@ -13,6 +13,8 @@ engine = create_engine(
     echo=False,
     pool_pre_ping=True,
     pool_recycle=3600,
+    # W5 调试: 临时开 echo 看 create_all 跑到哪
+    # echo=True,
 )
 
 SessionLocal = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
@@ -35,12 +37,21 @@ def session_scope() -> Session:
 
 def init_db():
     """建表（开发用，生产请用 alembic）"""
+    import logging
+    log = logging.getLogger(__name__)
+    log.info("init_db: 开始导入 models")
     # 导入所有模型，确保 Base.metadata 知道它们
     from src.models import (
         user, face, course, attendance, lab,
         course_enrollment, login_attempt,  # W4 Phase 1
     )  # noqa
-    Base.metadata.create_all(engine)
+    log.info("init_db: models 导入完成, 调 create_all")
+    try:
+        Base.metadata.create_all(engine)
+        log.info("init_db: create_all 完成")
+    except Exception as e:
+        log.error("init_db: create_all 抛异常: %s", e)
+        raise
 
 
 if __name__ == "__main__":
