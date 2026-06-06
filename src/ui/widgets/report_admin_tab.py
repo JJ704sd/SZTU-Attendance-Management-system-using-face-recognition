@@ -12,9 +12,8 @@ from typing import Optional
 
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
 from matplotlib.figure import Figure
-from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import (
-    QComboBox, QHBoxLayout, QHeaderView, QLabel,
+    QComboBox, QHBoxLayout, QLabel,
     QPushButton, QSizePolicy, QVBoxLayout, QWidget,
 )
 

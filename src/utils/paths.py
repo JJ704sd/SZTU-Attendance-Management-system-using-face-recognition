@@ -26,4 +26,5 @@ def get_app_root() -> Path:
 # 单例：所有引用方共享同一个路径
 APP_ROOT: Path = get_app_root()
 MODELS_DIR: Path = APP_ROOT / "models"
-DATASET_DIR: Path = APP_ROOT / "dataset"
+# 注意: 人脸采集图片路径走 src.config.Config.DATASET_DIR
+# (APP_ROOT / "dataset" / "face_images"), 不在这里重复定义, 避免不一致。

@@ -11,7 +11,6 @@ self.tabs 标准命名（跟 StudentWindow/TeacherWindow 一致）
 """
 import logging
 
-from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QFont
 from PyQt5.QtWidgets import (
     QHBoxLayout,
@@ -75,17 +74,6 @@ class AdminWindow(QWidget):
         main.addLayout(top)
         main.addWidget(self.tabs)
         self.setLayout(main)
-
-    def _placeholder(self, title: str, desc: str) -> QWidget:
-        page = QWidget()
-        layout = QVBoxLayout()
-        layout.setAlignment(Qt.AlignCenter)
-        lbl = QLabel(f"{title}\n\n{desc}")
-        lbl.setAlignment(Qt.AlignCenter)
-        lbl.setStyleSheet("color: gray; font-size: 14px; padding: 40px;")
-        layout.addWidget(lbl)
-        page.setLayout(layout)
-        return page
 
     def _on_logout(self):
         ret = QMessageBox.question(self, "确认", "确定要退出登录吗？",
