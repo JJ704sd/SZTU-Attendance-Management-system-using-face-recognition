@@ -281,8 +281,9 @@ def main() -> int:
     _section("7. 管理员 check_access 7 分支")
     try:
         from src.services.lab_access_service import LabAccessService
+        from src.models.course import Laboratory
         las = LabAccessService()
-        # 给 student 0 加一条有效培训
+        # 给 student 0 加一条有效培训 (类型=设备, 分数=85)
         with session_scope() as s:
             t = LabTraining(
                 student_id=students[0].id, lab_id=lab_id, training_type="设备",
@@ -290,24 +291,67 @@ def main() -> int:
                 score=85,
             )
             s.add(t); s.flush()
-            _ok(f"  student {students[0].id} 培训记录已加 (score=85)")
+            _ok(f"  student {students[0].id} 培训记录已加 (类型=设备, score=85)")
 
         # 7a admin 自由出入
         r = las.check_access(admin.id, lab_id)
-        _ok(f"  admin access: granted={r.granted} reason='{r.reason}'")
+        _ok(f"  [7a] admin (非学生) access: granted={r.granted} reason='{r.reason}'")
         # 7b student 0 有培训通过
         r = las.check_access(students[0].id, lab_id)
-        _ok(f"  student 0 (有培训, score 85) access: granted={r.granted} reason='{r.reason}'")
+        _ok(f"  [7b] student 0 (有培训 score 85) access: granted={r.granted} reason='{r.reason}'")
         # 7c student 1 无培训拒绝
         r = las.check_access(students[1].id, lab_id)
-        _ok(f"  student 1 (无培训) access: granted={r.granted} reason='{r.reason}'")
+        _ok(f"  [7c] student 1 (无培训) access: granted={r.granted} reason='{r.reason}'")
         # 7d 培训过期
         with session_scope() as s:
             s.query(LabTraining).filter(
                 LabTraining.student_id == students[0].id
             ).update({"expiry_date": date.today() - timedelta(days=1)})
         r = las.check_access(students[0].id, lab_id)
-        _ok(f"  student 0 (培训过期) access: granted={r.granted} reason='{r.reason}'")
+        _ok(f"  [7d] student 0 (培训过期) access: granted={r.granted} reason='{r.reason}'")
+        # 7e 培训类型不匹配 - 建化学 lab + student 0 加错类型培训
+        chem_lab_id = None
+        with session_scope() as s:
+            chem_lab = Laboratory(
+                name=f"化学实验室{suf}", safety_level=2, required_training="化学",
+            )
+            s.add(chem_lab); s.flush()
+            chem_lab_id = chem_lab.id
+            # 关键: 给 student 0 加 chem_lab 的"设备"培训 (错类型, 但有效)
+            wrong_type = LabTraining(
+                student_id=students[0].id, lab_id=chem_lab_id, training_type="设备",
+                completion_date=date.today(), expiry_date=date.today() + timedelta(days=365),
+                score=85,
+            )
+            s.add(wrong_type)
+            s.query(LabTraining).filter(
+                LabTraining.student_id == students[0].id,
+                LabTraining.lab_id == lab_id,  # 设备 lab 的培训
+            ).update({"expiry_date": date.today() + timedelta(days=365)})
+        r = las.check_access(students[0].id, chem_lab_id)
+        _ok(f"  [7e] student 0 (持设备, 化学实验室) access: granted={r.granted} reason='{r.reason}'")
+        # 7f 高等级分数不够 - safety_level=4 要 score>=90
+        high_lab_id = None
+        with session_scope() as s:
+            high_lab = Laboratory(
+                name=f"高等级实验室{suf}", safety_level=4, required_training="设备",
+            )
+            s.add(high_lab); s.flush()
+            high_lab_id = high_lab.id
+            # 给 student 0 加 high_lab 的"设备"培训 (类型对, 但分数 85 < 90)
+            high_train = LabTraining(
+                student_id=students[0].id, lab_id=high_lab_id, training_type="设备",
+                completion_date=date.today(), expiry_date=date.today() + timedelta(days=365),
+                score=85,
+            )
+            s.add(high_train)
+        r = las.check_access(students[0].id, high_lab_id)
+        _ok(f"  [7f] student 0 (score 85, safety=4) access: granted={r.granted} reason='{r.reason}'")
+        # 7g 不存在的 user / lab
+        r = las.check_access(999999, lab_id)
+        _ok(f"  [7g] 不存在 user (999999) access: granted={r.granted} reason='{r.reason}'")
+        r = las.check_access(students[0].id, 999999)
+        _ok(f"  [7g] 不存在 lab (999999) access: granted={r.granted} reason='{r.reason}'")
     except Exception as e:
         _fail(f"check_access 失败: {e}")
         import traceback; traceback.print_exc()
@@ -353,8 +397,8 @@ def main() -> int:
         from src.dao.lab_access_log_dao import LabAccessLogDao
         with session_scope() as s:
             # 倒序删 (FK 反向引用)
-            s.query(LabAccessLog).filter(LabAccessLog.lab_id == lab_id).delete()
-            s.query(LabTraining).filter(LabTraining.lab_id == lab_id).delete()
+            s.query(LabAccessLog).filter(LabAccessLog.lab_id.in_([lab_id, chem_lab_id, high_lab_id])).delete()
+            s.query(LabTraining).filter(LabTraining.lab_id.in_([lab_id, chem_lab_id, high_lab_id])).delete()
             # 删两个 task 的 leave/record (task_id + leave_task_id)
             for tid in [task_id, leave_task_id]:
                 s.query(LeaveRequest).filter(LeaveRequest.task_id == tid).delete()
@@ -362,7 +406,7 @@ def main() -> int:
                 s.query(AttendanceTask).filter(AttendanceTask.id == tid).delete()
             s.query(CourseEnrollment).filter(CourseEnrollment.course_id == course_id).delete()
             s.query(Course).filter(Course.id == course_id).delete()
-            s.query(Laboratory).filter(Laboratory.id == lab_id).delete()
+            s.query(Laboratory).filter(Laboratory.id.in_([lab_id, chem_lab_id, high_lab_id])).delete()
             s.query(User).filter(
                 User.username.like(f"smk_%_{suf}%")
             ).delete(synchronize_session=False)
