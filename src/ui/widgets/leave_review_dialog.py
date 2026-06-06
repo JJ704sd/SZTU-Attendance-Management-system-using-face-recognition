@@ -109,7 +109,13 @@ class LeaveReviewDialog(QDialog):
         if row < 0:
             return None
         item = self.table.item(row, 0)
-        return int(item.text()) if item else None
+        if item is None:
+            return None
+        # W11: 加 try/except 防 item.text() 异常
+        try:
+            return int(item.text())
+        except (ValueError, TypeError):
+            return None
 
     def _on_cell_double_clicked(self, row, col):
         req_id = self._selected_request_id()

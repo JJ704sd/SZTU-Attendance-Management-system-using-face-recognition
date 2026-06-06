@@ -436,8 +436,12 @@ class StudentWindow(QWidget):
         )
         if not ok:
             return
-        # 从 label 解析出 task_id
-        task_id = int(task_label.split(" - ")[0].lstrip("#"))
+        # 从 label 解析出 task_id (W11: 加 try/except 防 label 格式变更崩溃)
+        try:
+            task_id = int(task_label.split(" - ")[0].lstrip("#"))
+        except (ValueError, IndexError):
+            QMessageBox.warning(self, "提示", f"无法解析任务: {task_label}")
+            return
         # 输入 reason
         reason, ok = QInputDialog.getText(
             self, "请假原因", "请输入请假原因 (10 字以上):",

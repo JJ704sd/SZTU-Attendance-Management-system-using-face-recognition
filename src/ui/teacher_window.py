@@ -185,7 +185,13 @@ class TeacherWindow(QWidget):
         if row < 0:
             return None
         item = self.history_table.item(row, 0)
-        return int(item.text()) if item else None
+        if item is None:
+            return None
+        # W11: 加 try/except 防 item.text() 异常导致 UI 崩溃
+        try:
+            return int(item.text())
+        except (ValueError, TypeError):
+            return None
 
     def _on_view_detail(self):
         tid = self._selected_task_id()
