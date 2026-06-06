@@ -194,4 +194,8 @@ def welcome_suffix(user: User) -> str:
     name = user.real_name or ""
     if any(name.endswith(s) for s in ("同学", "老师", "管理员", "主任", "教授")):
         return ""
-    return {"student": " 同学", "teacher": " 老师"}.get(user.role, "")
+    return {
+        "student": " 同学",
+        "teacher": " 老师",
+        "lab_admin": " 管理员",
+    }.get(user.role, "")
