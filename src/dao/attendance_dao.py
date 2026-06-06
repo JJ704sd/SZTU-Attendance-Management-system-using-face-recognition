@@ -41,6 +41,13 @@ class AttendanceRecordDao(BaseDao[AttendanceRecord]):
             )
         ).first()
 
+    def find_by_student(self, student_id: int) -> List[AttendanceRecord]:
+        """某学生的所有考勤记录，按 sign_in_time 倒序（NULL 排最后 — 即未签到/补录的记录靠后）。
+        Phase 5 学生端 Tab 3 '我的考勤' 用。"""
+        return self.s.query(AttendanceRecord).filter(
+            AttendanceRecord.student_id == student_id
+        ).order_by(desc(AttendanceRecord.sign_in_time)).all()
+
     def count_by_status(self, task_id: int) -> dict:
         rows = self.s.query(
             AttendanceRecord.status, AttendanceRecord
