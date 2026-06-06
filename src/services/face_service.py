@@ -6,6 +6,7 @@ Phase 3 范围：collect_for_user 采集编排（dlib 检测 + 落盘 + 入库�
 Phase 4 会再加：内存缓存 _FaceCache + recognize()。
 """
 import logging
+import threading
 from typing import Callable, Dict, List, Optional, Tuple, TYPE_CHECKING
 
 import cv2
@@ -110,6 +111,7 @@ class FaceService:
         n_samples: int = None,
         on_progress: Optional[Callable[[int, int], None]] = None,
         cache: Optional["_FaceCache"] = None,
+        stop_event: Optional["threading.Event"] = None,
     ) -> dict:
         """
         从 camera 抓 n_samples 张人脸图，编码后入库。
@@ -118,6 +120,10 @@ class FaceService:
         cache: 可选；传入 _FaceCache.get() 时会在保存编码后增量更新缓存。
                传 None 时不更新缓存（默认；测试场景避免污染单例）。
                UI 层（Phase 5）应传 cache=_FaceCache.get()。
+
+        stop_event: 可选；threading.Event()。UI 取消采集时 .set()，
+                    collect_for_user 在每次循环开头检查。设了之后下一轮立即
+                    返回 {"ok": False, "error": "用户取消"}。默认 None = 不支持取消。
 
         ⚠️ 调用方必须在 Qt 工作线程里调（避免阻塞 UI），
         on_progress 回调里如果直接 setText/setValue 会段错误，
@@ -136,6 +142,9 @@ class FaceService:
         user_dir.mkdir(parents=True, exist_ok=True)
 
         while captured < n_samples:
+            if stop_event is not None and stop_event.is_set():
+                return {"ok": False, "captured": captured, "saved": saved,
+                        "error": "用户取消"}
             if not camera.is_running():
                 return {"ok": False, "captured": captured, "saved": saved,
                         "error": "摄像头断开"}
