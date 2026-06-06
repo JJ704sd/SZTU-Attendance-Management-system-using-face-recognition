@@ -86,7 +86,7 @@ class StudentWindow(QWidget):
         self.tabs.addTab(self._build_register_tab(), "人脸注册")
         self.tabs.addTab(self._build_signin_tab(),   "刷脸签到")
         self.tabs.addTab(self._build_my_attendance_tab(), "我的考勤")
-        self.tabs.addTab(self._build_lab_tab(),      "我的实验室")
+        self.tabs.addTab(self._build_leave_tab(),    "我的请假")
         # Tab 切换时刷新对应数据
         self.tabs.currentChanged.connect(self._on_tab_changed)
 
@@ -358,18 +358,100 @@ class StudentWindow(QWidget):
                 QTableWidgetItem("缺勤/补录" if r.sign_in_time is None else ""))
 
     # ==================================================================
-    # Tab 4: 我的实验室（W4 占位）
+    # Tab 4: 我的请假（W6 Phase 1 接入 LeaveService）
     # ==================================================================
-    def _build_lab_tab(self) -> QWidget:
+    def _build_leave_tab(self) -> QWidget:
+        """请假申请 + 历史查询。"""
         page = QWidget()
         layout = QVBoxLayout()
-        layout.setAlignment(Qt.AlignCenter)
-        info = QLabel("🧪 我的实验室\n\nW4 接入：\n• 已授权实验室列表\n• 申请新准入\n• 安全培训状态")
-        info.setAlignment(Qt.AlignCenter)
-        info.setStyleSheet("color: gray; font-size: 14px; padding: 40px;")
+
+        info = QLabel("📝 请假申请\n\n对 open 状态的考勤任务发起请假, 老师审批后自动计入考勤记录")
+        info.setStyleSheet("color: gray;")
         layout.addWidget(info)
+
+        # 工具栏
+        toolbar = QHBoxLayout()
+        self.apply_leave_btn = QPushButton("📝 申请请假")
+        self.apply_leave_btn.setProperty("role", "primary")
+        self.apply_leave_btn.clicked.connect(self._on_apply_leave)
+        self.refresh_leave_btn = QPushButton("🔄 刷新")
+        self.refresh_leave_btn.clicked.connect(self._refresh_my_leaves)
+        toolbar.addWidget(self.apply_leave_btn)
+        toolbar.addWidget(self.refresh_leave_btn)
+        toolbar.addStretch()
+        layout.addLayout(toolbar)
+
+        # 请假历史表
+        self.leave_table = QTableWidget()
+        self.leave_table.setColumnCount(5)
+        self.leave_table.setHorizontalHeaderLabels(
+            ["申请时间", "任务ID", "原因", "状态", "审批备注"]
+        )
+        self.leave_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        self.leave_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        layout.addWidget(self.leave_table)
+
         page.setLayout(layout)
         return page
+
+    def _refresh_my_leaves(self):
+        """刷新本人请假历史。"""
+        from src.services.leave_service import LeaveService
+        leaves = LeaveService().list_by_student(self.user.id)
+        self.leave_table.setRowCount(len(leaves))
+        for i, r in enumerate(leaves):
+            self.leave_table.setItem(
+                i, 0,
+                QTableWidgetItem(r.created_at.strftime("%Y-%m-%d %H:%M") if r.created_at else "—"))
+            self.leave_table.setItem(i, 1, QTableWidgetItem(f"#{r.task_id}"))
+            self.leave_table.setItem(i, 2, QTableWidgetItem(r.reason or ""))
+            color, text = {
+                "pending": ("#D97706", "⏳ 待审批"),
+                "approved": ("#16A34A", "✅ 已批准"),
+                "rejected": ("#DC2626", "❌ 已拒绝"),
+            }.get(r.status, ("#6B7280", r.status))
+            status_item = QTableWidgetItem(text)
+            status_item.setForeground(QColor(color))
+            self.leave_table.setItem(i, 3, status_item)
+            self.leave_table.setItem(i, 4, QTableWidgetItem(
+                f"审批人 #{r.approver_id} @ {r.approve_time:%m-%d %H:%M}" if r.approver_id else ""
+            ))
+
+    def _on_apply_leave(self):
+        """申请请假：弹输入框选 task_id + reason。"""
+        from src.dao.attendance_dao import AttendanceTaskDao
+        from src.services.leave_service import LeaveError, LeaveService
+
+        # 1. 列出 open 任务给选
+        with session_scope() as s:
+            open_tasks = AttendanceTaskDao(s).find_open_tasks()
+        if not open_tasks:
+            QMessageBox.information(self, "提示", "没有 open 任务可以请假")
+            return
+        # 简化: 直接输入 task_id (任务多时改成 combo)
+        from PyQt5.QtWidgets import QInputDialog
+        task_items = [f"#{t.id} - {t.start_time:%m-%d %H:%M}" for t in open_tasks]
+        task_label, ok = QInputDialog.getItem(
+            self, "选任务", "请选择要请假的任务:", task_items, 0, False,
+        )
+        if not ok:
+            return
+        # 从 label 解析出 task_id
+        task_id = int(task_label.split(" - ")[0].lstrip("#"))
+        # 输入 reason
+        reason, ok = QInputDialog.getText(
+            self, "请假原因", "请输入请假原因 (10 字以上):",
+        )
+        if not ok or not reason.strip() or len(reason.strip()) < 5:
+            QMessageBox.warning(self, "提示", "请输入至少 5 个字的请假原因")
+            return
+        # 提交
+        try:
+            req = LeaveService().student_apply(self.user.id, task_id, reason.strip())
+            QMessageBox.information(self, "成功", f"请假申请已提交 (id=#{req.id})")
+            self._refresh_my_leaves()
+        except LeaveError as e:
+            QMessageBox.warning(self, "申请失败", str(e))
 
     # ==================================================================
     # 公共辅助
@@ -421,6 +503,9 @@ class StudentWindow(QWidget):
         # 切到 Tab 2（我的考勤）刷新表格
         elif idx == 2:
             self._refresh_my_attendance()
+        # 切到 Tab 3（请假）刷新表格
+        elif idx == 3:
+            self._refresh_my_leaves()
 
     # ==================================================================
     # 退出登录

@@ -201,7 +201,7 @@ def main() -> int:
         return 1
 
     # ====================================================
-    # 6. 老师查 report_service
+    # 6. 老师查报表
     # ====================================================
     _section("6. 老师查报表")
     try:
@@ -215,6 +215,63 @@ def main() -> int:
         _ok(f"  absent_warning_list: {len(warn)} warnings (threshold=0.8)")
     except Exception as e:
         _fail(f"report_service 失败: {e}")
+        import traceback; traceback.print_exc()
+        return 1
+
+    # ====================================================
+    # 6.5. W6 Phase 1: 请假流程 (用新 task, 跟 step 5 关闭的 task 隔离)
+    # ====================================================
+    _section("6.5 W6 Phase 1: 请假流程")
+    try:
+        from src.services.leave_service import LeaveService, LeaveError
+        ls = LeaveService()
+        # 新建 open task 专门测请假
+        now = datetime.now()
+        leave_task_id = att.create_task(
+            course_id=course_id, teacher_id=teacher.id, classroom_id=1,
+            start_time=now, end_time=now + timedelta(hours=2),
+        )
+        _ok(f"  新建 open task: task_id={leave_task_id}")
+
+        # student 0 申请请假
+        req = ls.student_apply(students[0].id, leave_task_id, "医院看病，附病历")
+        _ok(f"  student 0 申请: req_id={req.id} status=pending")
+        # 老师查待审批
+        pending = ls.list_pending_for_task(leave_task_id)
+        _ok(f"  老师查 pending: {len(pending)} 条 (期望 1)")
+        assert len(pending) == 1 and pending[0].id == req.id
+        # 老师批准
+        approved = ls.teacher_review(req.id, teacher.id, approve=True, comment="OK")
+        _ok(f"  老师批准: req_id={req.id} status=approved approver_id={approved.approver_id}")
+        # student 1 也请假, 但拒绝
+        req2 = ls.student_apply(students[1].id, leave_task_id, "理由不充分")
+        rejected = ls.teacher_review(req2.id, teacher.id, approve=False)
+        _ok(f"  student 1 拒绝: req_id={req2.id} status=rejected")
+        # student 2 也申请
+        req3 = ls.student_apply(students[2].id, leave_task_id, "其他原因")
+        _ok(f"  student 2 也申请: req_id={req3.id} (待审批)")
+        # 验证 approve 把 record 状态变 leave
+        with session_scope() as s:
+            from src.models.attendance import AttendanceRecord
+            rec = s.query(AttendanceRecord).filter(
+                AttendanceRecord.task_id == leave_task_id,
+                AttendanceRecord.student_id == students[0].id,
+            ).first()
+            # 之前没 record (新 task, 没签到), 验证 record 状态 (可能为 None)
+            if rec:
+                _ok(f"  student 0 record status: {rec.status} (期望 leave)")
+                assert rec.status == "leave"
+            else:
+                _ok(f"  student 0 无 record (新 task 没签到), close_task 后会补 leave")
+        # 异常: 任务关闭后不能再申请
+        att.close_task_and_mark_absent(leave_task_id)
+        try:
+            ls.student_apply(students[2].id, leave_task_id, "补请假")
+            _fail("  期望抛 LeaveError 但没抛")
+        except LeaveError as e:
+            _ok(f"  任务关闭后不能补请假: {e}")
+    except Exception as e:
+        _fail(f"请假流程失败: {e}")
         import traceback; traceback.print_exc()
         return 1
 
@@ -291,15 +348,18 @@ def main() -> int:
     # ====================================================
     _section("9. 清理测试数据")
     try:
-        from src.models.attendance import AttendanceRecord, AttendanceTask
+        from src.models.attendance import AttendanceRecord, AttendanceTask, LeaveRequest
         from src.models.lab import LabAccessLog
         from src.dao.lab_access_log_dao import LabAccessLogDao
         with session_scope() as s:
             # 倒序删 (FK 反向引用)
             s.query(LabAccessLog).filter(LabAccessLog.lab_id == lab_id).delete()
             s.query(LabTraining).filter(LabTraining.lab_id == lab_id).delete()
-            s.query(AttendanceRecord).filter(AttendanceRecord.task_id == task_id).delete()
-            s.query(AttendanceTask).filter(AttendanceTask.id == task_id).delete()
+            # 删两个 task 的 leave/record (task_id + leave_task_id)
+            for tid in [task_id, leave_task_id]:
+                s.query(LeaveRequest).filter(LeaveRequest.task_id == tid).delete()
+                s.query(AttendanceRecord).filter(AttendanceRecord.task_id == tid).delete()
+                s.query(AttendanceTask).filter(AttendanceTask.id == tid).delete()
             s.query(CourseEnrollment).filter(CourseEnrollment.course_id == course_id).delete()
             s.query(Course).filter(Course.id == course_id).delete()
             s.query(Laboratory).filter(Laboratory.id == lab_id).delete()

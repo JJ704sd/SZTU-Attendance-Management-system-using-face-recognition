@@ -24,6 +24,13 @@ class AttendanceTaskDao(BaseDao[AttendanceTask]):
             AttendanceTask.status == "open"
         ).all()
 
+    def find_open_tasks_for_teacher(self, teacher_id: int) -> List[AttendanceTask]:
+        """某老师所有 open 状态的任务 (W6 Phase 1 LeaveReviewDialog 用)。"""
+        return self.s.query(AttendanceTask).filter(
+            AttendanceTask.teacher_id == teacher_id,
+            AttendanceTask.status == "open",
+        ).order_by(desc(AttendanceTask.start_time)).all()
+
 
 class AttendanceRecordDao(BaseDao[AttendanceRecord]):
     model = AttendanceRecord

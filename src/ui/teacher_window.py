@@ -134,8 +134,11 @@ class TeacherWindow(QWidget):
         self.view_detail_btn.clicked.connect(self._on_view_detail)
         self.close_task_btn = QPushButton("结束选中任务")
         self.close_task_btn.clicked.connect(self._on_close_task)
+        self.pending_leave_btn = QPushButton("📝 待审批请假")
+        self.pending_leave_btn.clicked.connect(self._on_review_leave)
         toolbar.addWidget(self.refresh_btn)
         toolbar.addWidget(self.view_detail_btn)
+        toolbar.addWidget(self.pending_leave_btn)
         toolbar.addWidget(self.close_task_btn)
         toolbar.addStretch()
         layout.addLayout(toolbar)
@@ -207,6 +210,12 @@ class TeacherWindow(QWidget):
             QMessageBox.information(self, "完成", "任务已结束，缺勤学生已标记")
             self._refresh_history()
             self._refresh_open_task_label()
+
+    def _on_review_leave(self):
+        """打开待审批请假弹窗 (W6 Phase 1)。"""
+        from src.ui.widgets.leave_review_dialog import LeaveReviewDialog
+        dlg = LeaveReviewDialog(self.user, parent=self)
+        dlg.exec_()
 
     # =====================================================
     # Tab 3: 统计报表（占位）
