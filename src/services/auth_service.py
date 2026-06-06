@@ -46,6 +46,18 @@ class AuthService:
         if role == ROLE_STUDENT and not student_id:
             raise AuthError("学生必须填写学号")
 
+        # 字段长度校验 (与 User model String 列长度对齐, 避免 MySQL silent truncate / error)
+        if len(real_name) > 50:
+            raise AuthError("真实姓名不超过 50 字符")
+        if student_id is not None and len(student_id) > 20:
+            raise AuthError("学号不超过 20 字符")
+        if direction is not None and len(direction) > 50:
+            raise AuthError("专业方向不超过 50 字符")
+        if email is not None and len(email) > 100:
+            raise AuthError("邮箱不超过 100 字符")
+        if phone is not None and len(phone) > 20:
+            raise AuthError("电话不超过 20 字符")
+
         with session_scope() as s:
             dao = UserDao(s)
             if dao.find_by_username(username):

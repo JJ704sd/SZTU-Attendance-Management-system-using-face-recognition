@@ -73,6 +73,30 @@ def test_register_student_must_have_student_id(auth: AuthService):
                       role="student", student_id=None)
 
 
+def test_register_field_length_validated(auth: AuthService):
+    """真实姓名/学号/邮箱/电话 超过列长应被拒绝 (避免 MySQL truncate)."""
+    # 真实姓名 > 50
+    with pytest.raises(AuthError, match="真实姓名不超过"):
+        auth.register(username=_uni("u"), password="123456",
+                      real_name="x" * 51, role="teacher")
+    # 学号 > 20
+    with pytest.raises(AuthError, match="学号不超过"):
+        auth.register(username=_uni("u"), password="123456", real_name="X",
+                      role="student", student_id="s" * 21)
+    # 邮箱 > 100
+    with pytest.raises(AuthError, match="邮箱不超过"):
+        auth.register(username=_uni("u"), password="123456", real_name="X",
+                      role="teacher", email="a" * 101)
+    # 电话 > 20
+    with pytest.raises(AuthError, match="电话不超过"):
+        auth.register(username=_uni("u"), password="123456", real_name="X",
+                      role="teacher", phone="1" * 21)
+    # 专业方向 > 50
+    with pytest.raises(AuthError, match="专业方向不超过"):
+        auth.register(username=_uni("u"), password="123456", real_name="X",
+                      role="teacher", direction="d" * 51)
+
+
 def test_login_wrong_password(auth: AuthService):
     username = _uni("u")
     auth.register(username=username, password="123456", real_name="A",
