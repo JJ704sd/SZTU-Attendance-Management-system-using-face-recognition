@@ -6,12 +6,18 @@ W4 用途：lab_access_service.check_access 查询 user 是否在该 lab 有有�
 from datetime import date
 from typing import List, Optional
 
+from sqlalchemy import desc
+
 from src.dao.base import BaseDao
 from src.models.lab import LabTraining
 
 
 class LabTrainingDao(BaseDao[LabTraining]):
     model = LabTraining
+
+    def find_all(self) -> List[LabTraining]:
+        """所有培训记录（按创建时间倒序）。Phase 5b admin Tab 用。"""
+        return self.s.query(LabTraining).order_by(desc(LabTraining.id)).all()
 
     def find_by_student(self, student_id: int) -> List[LabTraining]:
         return self.s.query(LabTraining).filter(

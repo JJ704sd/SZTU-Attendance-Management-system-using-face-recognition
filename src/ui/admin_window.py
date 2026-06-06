@@ -3,7 +3,7 @@ ui/admin_window.py — 实验室管理员端主窗口
 
 W4 Phase 5 接入进度:
 - ✅ Tab 1 实验室管理: CRUD（Phase 5a 完成）
-- ⏳ Tab 2 安全培训录入: 留 placeholder（Phase 5b）
+- ✅ Tab 2 安全培训录入: CRUD（Phase 5b 完成）
 - ⏳ Tab 3 准入日志: 留 placeholder（Phase 5c）
 - ⏳ Tab 4 使用率报表: 留 placeholder（Phase 5d）
 
@@ -50,15 +50,18 @@ class AdminWindow(QWidget):
         self.logout_btn.clicked.connect(self._on_logout)
         top.addWidget(self.logout_btn)
 
-        # self.tabs 标准命名（Phase 5 接入会连 currentChanged 切 Tab 刷新）
         self.tabs = QTabWidget()
         # Tab 1 实验室管理（Phase 5a 完成）
         from src.ui.widgets.lab_admin_tab import LabAdminTab
         self.tab_lab = LabAdminTab()
         self.tabs.addTab(self.tab_lab, "🏛 实验室管理")
 
-        # Tab 2/3/4 仍 placeholder（5b/5c/5d 待开）
-        self.tabs.addTab(self._placeholder("📋 安全培训录入", "W4 Phase 5b: 录入学生培训记录"), "安全培训")
+        # Tab 2 安全培训录入（Phase 5b 完成）
+        from src.ui.widgets.training_admin_tab import TrainingAdminTab
+        self.tab_training = TrainingAdminTab()
+        self.tabs.addTab(self.tab_training, "📋 安全培训")
+
+        # Tab 3/4 仍 placeholder（5c/5d 待开）
         self.tabs.addTab(self._placeholder("🚪 准入日志", "W4 Phase 5c: 实时查看准入记录"), "准入日志")
         self.tabs.addTab(self._placeholder("📊 使用率报表", "W4 Phase 5d: matplotlib 报表"), "使用率报表")
 
@@ -86,4 +89,5 @@ class AdminWindow(QWidget):
             self.login_win = LoginWindow()
             self.login_win.show()
             self.close()
+
 
