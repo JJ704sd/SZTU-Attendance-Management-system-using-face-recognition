@@ -179,6 +179,34 @@ CREATE TABLE lab_access_log (
     INDEX idx_lab_time (lab_id, access_time)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='实验室准入日志';
 
+-- -----------------------------------------------------
+-- 11. 选课表（学生 ↔ 课程 多对多；W4 修 close_task 用）
+-- -----------------------------------------------------
+CREATE TABLE course_enrollment (
+    id            INT PRIMARY KEY AUTO_INCREMENT,
+    student_id    INT NOT NULL,
+    course_id     INT NOT NULL,
+    enrolled_at   DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (student_id) REFERENCES user(id) ON DELETE CASCADE,
+    FOREIGN KEY (course_id) REFERENCES course(id) ON DELETE CASCADE,
+    UNIQUE KEY uk_student_course (student_id, course_id),
+    INDEX idx_student (student_id),
+    INDEX idx_course (course_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='选课表';
+
+-- -----------------------------------------------------
+-- 12. 登录尝试记录（防暴力破解；W4 auth_service.login 加 LOGIN_MAX_ATTEMPTS）
+-- -----------------------------------------------------
+CREATE TABLE login_attempt (
+    id            INT PRIMARY KEY AUTO_INCREMENT,
+    username      VARCHAR(50) NOT NULL COMMENT '登录用户名',
+    attempted_at  DATETIME DEFAULT CURRENT_TIMESTAMP,
+    success       TINYINT(1) NOT NULL COMMENT '1成功/0失败',
+    ip_address    VARCHAR(45) COMMENT 'IPv4/IPv6',
+    INDEX idx_user_time (username, attempted_at DESC),
+    INDEX idx_time (attempted_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='登录尝试记录';
+
 -- =====================================================
 -- 测试数据（可选，用于演示）
 -- =====================================================

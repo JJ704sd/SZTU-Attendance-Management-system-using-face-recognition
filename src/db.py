@@ -36,7 +36,10 @@ def session_scope() -> Session:
 def init_db():
     """建表（开发用，生产请用 alembic）"""
     # 导入所有模型，确保 Base.metadata 知道它们
-    from src.models import user, face, course, attendance, lab  # noqa
+    from src.models import (
+        user, face, course, attendance, lab,
+        course_enrollment, login_attempt,  # W4 Phase 1
+    )  # noqa
     Base.metadata.create_all(engine)
 
 
