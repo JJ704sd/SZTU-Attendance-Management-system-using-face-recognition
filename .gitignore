@@ -63,7 +63,9 @@ dataset/
 # ---------- PyInstaller 产物 ----------
 build/
 dist/
-*.spec
+# 显式保留 build.spec（手动维护）
+# 其他自动生成的 spec 不入仓
+*.spec.bak
 
 # ---------- 日志 ----------
 *.log
