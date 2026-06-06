@@ -17,6 +17,7 @@ from PyQt5.QtWidgets import (
     QPushButton, QSizePolicy, QVBoxLayout, QWidget,
 )
 
+from src.dao.course_dao import CourseDao
 from src.dao.lab_dao import LabDao
 from src.db import session_scope
 from src.services.report_service import ReportService
@@ -64,12 +65,18 @@ class ReportAdminTab(QWidget):
         toolbar.addWidget(self.chart_combo)
 
         # 课程下拉（出勤率/趋势图用）
-        self.course_label = QLabel("课程 ID:")
+        self.course_label = QLabel("课程:")
         toolbar.addWidget(self.course_label)
-        self.course_edit = QComboBox()
-        self.course_edit.setEditable(True)  # 让用户能输入任意 course_id
-        self.course_edit.setMinimumWidth(120)
-        toolbar.addWidget(self.course_edit)
+        self.course_combo = QComboBox()
+        self.course_combo.setMinimumWidth(180)
+        # 加载所有课程（按课程代码排序）到下拉；用户也能手输 course_id 查
+        with session_scope() as s:
+            courses = CourseDao(s).find_all()
+        for c in courses:
+            self.course_combo.addItem(f"#{c.id} {c.course_code} {c.course_name}", c.id)
+        if courses:
+            self.course_combo.setCurrentIndex(0)
+        toolbar.addWidget(self.course_combo)
 
         # 实验室下拉（热力图用）
         self.lab_label = QLabel("实验室:")
@@ -120,7 +127,7 @@ class ReportAdminTab(QWidget):
         # 课程相关：出勤率/趋势图用
         course_visible = chart_type in ("attendance_rate", "attendance_trend")
         self.course_label.setVisible(course_visible)
-        self.course_edit.setVisible(course_visible)
+        self.course_combo.setVisible(course_visible)
 
         # 实验室相关：热力图用
         lab_visible = chart_type == "lab_usage"
@@ -157,12 +164,12 @@ class ReportAdminTab(QWidget):
         chart_type = self.chart_combo.currentData()
         try:
             if chart_type == "attendance_rate":
-                course_id = int(self.course_edit.currentText() or 1)
+                course_id = self._current_course_id()
                 data = ReportService().attendance_rate_per_student(course_id=course_id)
                 fig = chart_attendance_rate_bar(data, title=f"课程 #{course_id} 学生出勤率")
                 self._render(fig, f"已渲染 {len(data)} 个学生出勤率（课程 #{course_id}）")
             elif chart_type == "attendance_trend":
-                course_id = int(self.course_edit.currentText() or 1)
+                course_id = self._current_course_id()
                 data = ReportService().attendance_trend_per_course(course_id, days=DEFAULT_ATTENDANCE_DAYS)
                 fig = chart_attendance_trend_line(
                     data, title=f"课程 #{course_id} 30 天出勤率趋势",
@@ -201,6 +208,15 @@ class ReportAdminTab(QWidget):
             log.exception("渲染图表失败")
             fig = self._placeholder_fig(f"渲染失败: {e}")
             self._render(fig, f"渲染失败: {e}")
+
+    def _current_course_id(self) -> int:
+        """取当前选中课程的 ID。
+        优先用 currentData (addItem 进来的), 兜底解析 currentText (用户手输)。
+        都拿不到就回退到 1 (跟原行为一致, 不破坏现有逻辑)。"""
+        cid = self.course_combo.currentData()
+        if cid is not None:
+            return int(cid)
+        return int(self.course_combo.currentText() or 1)
 
     def _placeholder_fig(self, message: str) -> Figure:
         """占位 Figure（避免模态对话框阻塞 + offscreen 段错误）。"""
