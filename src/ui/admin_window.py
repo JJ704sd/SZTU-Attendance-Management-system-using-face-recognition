@@ -1,10 +1,13 @@
 """
-ui/admin_window.py — 实验室管理员端主窗口（占位，待 W4 完整接入）
+ui/admin_window.py — 实验室管理员端主窗口
 
-Phase 5 占位状态:
-- 4 个 Tab 都是 _placeholder() 占位文案
-- self.tabs 已经按 StudentWindow/TeacherWindow 标准命名
-- 顶部信息条复用 welcome_suffix() 工具（避免硬编码"管理员"后缀）
+W4 Phase 5 接入进度:
+- ✅ Tab 1 实验室管理: CRUD（Phase 5a 完成）
+- ⏳ Tab 2 安全培训录入: 留 placeholder（Phase 5b）
+- ⏳ Tab 3 准入日志: 留 placeholder（Phase 5c）
+- ⏳ Tab 4 使用率报表: 留 placeholder（Phase 5d）
+
+self.tabs 标准命名（跟 StudentWindow/TeacherWindow 一致）
 """
 import logging
 
@@ -34,7 +37,7 @@ class AdminWindow(QWidget):
 
     def _init_ui(self):
         self.setWindowTitle(f"实验室管理员端 — {self.user.real_name}")
-        self.resize(900, 600)
+        self.resize(1000, 640)
 
         top = QHBoxLayout()
         welcome = QLabel(f"欢迎，{self.user.real_name}{welcome_suffix(self.user)}")
@@ -47,13 +50,17 @@ class AdminWindow(QWidget):
         self.logout_btn.clicked.connect(self._on_logout)
         top.addWidget(self.logout_btn)
 
-        # self.tabs 标准命名（跟 StudentWindow/TeacherWindow 一致，
-        # Phase 5 接入时会用 self.tabs.currentChanged.connect 切 Tab 刷新）
+        # self.tabs 标准命名（Phase 5 接入会连 currentChanged 切 Tab 刷新）
         self.tabs = QTabWidget()
-        self.tabs.addTab(self._placeholder("🏛 实验室管理", "W4 接入：CRUD 实验室信息"), "实验室管理")
-        self.tabs.addTab(self._placeholder("📋 安全培训录入", "W4 接入：录入学生培训记录"), "安全培训")
-        self.tabs.addTab(self._placeholder("🚪 准入日志", "W4 接入：实时查看准入记录"), "准入日志")
-        self.tabs.addTab(self._placeholder("📊 使用率报表", "W4 接入：matplotlib 报表"), "使用率报表")
+        # Tab 1 实验室管理（Phase 5a 完成）
+        from src.ui.widgets.lab_admin_tab import LabAdminTab
+        self.tab_lab = LabAdminTab()
+        self.tabs.addTab(self.tab_lab, "🏛 实验室管理")
+
+        # Tab 2/3/4 仍 placeholder（5b/5c/5d 待开）
+        self.tabs.addTab(self._placeholder("📋 安全培训录入", "W4 Phase 5b: 录入学生培训记录"), "安全培训")
+        self.tabs.addTab(self._placeholder("🚪 准入日志", "W4 Phase 5c: 实时查看准入记录"), "准入日志")
+        self.tabs.addTab(self._placeholder("📊 使用率报表", "W4 Phase 5d: matplotlib 报表"), "使用率报表")
 
         main = QVBoxLayout()
         main.addLayout(top)
@@ -79,3 +86,4 @@ class AdminWindow(QWidget):
             self.login_win = LoginWindow()
             self.login_win.show()
             self.close()
+
