@@ -127,4 +127,15 @@ src/
 - 📋 W3 详细计划：[`docs/superpowers/plans/2026-06-04-W3-face-recognition.md`](docs/superpowers/plans/2026-06-04-W3-face-recognition.md)
 - ❌ 待做：W3 Phase 4（recognize service + `_FaceCache`）、Phase 5（学生端 3 tab 重写）、Phase 6（smoke_face.py + E2E 文档）；W4（实验室管理 + 报表）；W5（PyInstaller）；W6（报告 PPT）
 
+## W3 Phase 5 学生端接入时必踩的坑
+
+`face_service.collect_for_user` 设计上**在 Qt 工作线程里跑**（dlib 编码每次 ~50-100ms，不能阻塞主线程）。`on_progress` 回调里如果直接 `label.setText(...)` / `progress_bar.setValue(...)` → **PyQt 段错误**。
+
+正确做法（已写进 `face_service.collect_for_user` docstring）：
+- 在 Widget 里 `progress_updated = pyqtSignal(int, int)`
+- 启动采集时 `worker.progress_updated.connect(self._on_progress, Qt.QueuedConnection)`
+- worker 里 `self.progress_updated.emit(captured, total)` 代替直接调回调
+
+参考：Qt 跨线程信号固定 `Qt.QueuedConnection` 即可。
+
 详细分工见 `docs/TEAM_AND_TIMELINE.md`。

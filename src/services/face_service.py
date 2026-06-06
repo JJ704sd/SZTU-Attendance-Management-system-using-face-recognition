@@ -113,6 +113,11 @@ class FaceService:
         """
         从 camera 抓 n_samples 张人脸图，编码后入库。
         返回: {"ok": bool, "captured": int, "saved": int, "error": str|None}
+
+        ⚠️ 调用方必须在 Qt 工作线程里调（避免阻塞 UI），
+        on_progress 回调里如果直接 setText/setValue 会段错误，
+        正确做法：把 on_progress 设成 QObject 的 pyqtSignal.emit，
+        UI 端用 Qt.QueuedConnection 跨线程更新。
         """
         if n_samples is None:
             n_samples = Config.FACE_SAMPLE_COUNT
