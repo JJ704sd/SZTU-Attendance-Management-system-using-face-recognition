@@ -22,7 +22,7 @@ bcrypt==5.0.0
 python-dotenv==1.1.0
 numpy==2.3.5
 Pillow>=10.0.0
-matplotlib==3.8.2
+matplotlib==3.10.9  # 3.9+ 起支持 numpy 2.x；3.8.x 仍要求 numpy<2 会和 numpy==2.3.5 冲突
 
 # --- 测试 ---
 pytest>=8.0
