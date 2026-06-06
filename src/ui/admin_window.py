@@ -3,9 +3,9 @@ ui/admin_window.py — 实验室管理员端主窗口
 
 W4 Phase 5 接入进度:
 - ✅ Tab 1 实验室管理: CRUD（Phase 5a 完成）
-- ✅ Tab 2 安全培训录入: CRUD（Phase 5b 完成）
-- ✅ Tab 3 准入日志: 只读 + 筛选（Phase 5c 完成）
-- ⏳ Tab 4 使用率报表: 留 placeholder（Phase 5d）
+- ✅ Tab 2 安全培训录入: CRUD（Phase 5b完成）
+- ✅ Tab 3 准入日志: 只读 + 筛选（Phase 5c完成）
+- ✅ Tab 4 使用率报表: matplotlib 嵌入 + 4 类图表切换（Phase 5d完成）
 
 self.tabs 标准命名（跟 StudentWindow/TeacherWindow 一致）
 """
@@ -37,7 +37,7 @@ class AdminWindow(QWidget):
 
     def _init_ui(self):
         self.setWindowTitle(f"实验室管理员端 — {self.user.real_name}")
-        self.resize(1000, 640)
+        self.resize(1100, 700)  # 加宽以容纳 matplotlib 图表
 
         top = QHBoxLayout()
         welcome = QLabel(f"欢迎，{self.user.real_name}{welcome_suffix(self.user)}")
@@ -66,8 +66,10 @@ class AdminWindow(QWidget):
         self.tab_log = AccessLogTab()
         self.tabs.addTab(self.tab_log, "🚪 准入日志")
 
-        # Tab 4 仍 placeholder（5d 待开）
-        self.tabs.addTab(self._placeholder("📊 使用率报表", "W4 Phase 5d: matplotlib 报表"), "使用率报表")
+        # Tab 4 使用率报表（Phase 5d 完成）
+        from src.ui.widgets.report_admin_tab import ReportAdminTab
+        self.tab_report = ReportAdminTab()
+        self.tabs.addTab(self.tab_report, "📊 使用率报表")
 
         main = QVBoxLayout()
         main.addLayout(top)
@@ -93,6 +95,7 @@ class AdminWindow(QWidget):
             self.login_win = LoginWindow()
             self.login_win.show()
             self.close()
+
 
 
 

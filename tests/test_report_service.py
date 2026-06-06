@@ -231,11 +231,15 @@ def test_absent_warning_list_filters_by_threshold(course_and_students):
         _create_record(s, t1, s3.id, "absent")
 
     warnings = ReportService().absent_warning_list(threshold=0.8)
-    student_ids = {w.student_id for w in warnings}
+    # absent_warning_list 是全表扫描（跨所有课程聚合），DB 里可能残留
+    # 其他测试的学生数据，过滤到 fixture 自己的 3 个学生再断言相对顺序。
+    fixture_ids = {s1.id, s2.id, s3.id}
+    fixture_warnings = [w for w in warnings if w.student_id in fixture_ids]
+    student_ids = {w.student_id for w in fixture_warnings}
     assert s1.id not in student_ids
     assert s2.id in student_ids
     assert s3.id in student_ids
     # 排序按 rate 升序（最差排前）
-    assert warnings[0].student_id == s3.id
-    assert warnings[1].student_id == s2.id
-    assert all(w.course_name == "（全部课程）" for w in warnings)
+    assert fixture_warnings[0].student_id == s3.id
+    assert fixture_warnings[1].student_id == s2.id
+    assert all(w.course_name == "（全部课程）" for w in fixture_warnings)
