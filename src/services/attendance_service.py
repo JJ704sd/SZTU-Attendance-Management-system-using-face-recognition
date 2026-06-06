@@ -80,16 +80,29 @@ class AttendanceService:
     # 任务结束：自动标记缺勤
     # -----------------------------------------------------
     def close_task_and_mark_absent(self, task_id: int):
-        """end_time 到达后调用，遍历课程学生名单补齐缺勤"""
+        """end_time 到达后调用，遍历课程学生名单补齐缺勤。
+
+        W4 Phase 3b: 改用 course_enrollment 选课名单代替"role=student 全部"。
+        防御性降级: 如果该课程无任何选课记录（旧数据 / 演示场景），fallback 到
+        role='student'，保持旧行为不挂。
+        """
         with session_scope() as s:
             task = s.get(AttendanceTask, task_id)
             if not task:
                 return
             task.status = "closed"
 
-            # 简化：把 role='student' 的所有用户视为名单
-            # 实际应有 course_enrollment 选课表
-            students = s.query(User).filter(User.role == "student").all()
+            # 1. 查 course_enrollment 该课程的学生
+            from src.dao.course_enrollment_dao import CourseEnrollmentDao
+            enrollments = CourseEnrollmentDao(s).find_by_course(task.course_id)
+
+            if enrollments:
+                student_ids = {e.student_id for e in enrollments}
+                students = s.query(User).filter(User.id.in_(student_ids)).all()
+            else:
+                # 防御性降级: 无 enrollment → fallback 到所有 student
+                students = s.query(User).filter(User.role == "student").all()
+
             for stu in students:
                 existed = s.query(AttendanceRecord).filter(
                     and_(AttendanceRecord.task_id == task_id,
