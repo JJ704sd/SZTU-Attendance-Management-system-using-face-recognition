@@ -29,17 +29,43 @@ FACE_REC_MODEL_URL = (
 
 
 def _download_and_decompress(url: str, target: Path):
-    """下载 .bz2 文件并解压到 target"""
+    """下载 .bz2 文件并解压到 target
+
+    W9 修复:
+    - 加 timeout (默认 60s), 避免 GitHub 慢响应时 urlretrieve 永久阻塞
+    - 改用 logging 而非 print, 跟项目其它代码一致
+    - 解压失败保留 bz2 文件, 避免下次重下 100MB
+    """
+    import logging
+    log = logging.getLogger(__name__)
+
     target.parent.mkdir(parents=True, exist_ok=True)
     bz2_path = target.with_suffix(target.suffix + ".bz2")
-    if not target.exists():
-        print(f"[INFO] Downloading {url} -> {target.name}")
-        urllib.request.urlretrieve(url, bz2_path)
-        print("[INFO] Decompressing ...")
+    if target.exists():
+        return
+    log.info("Downloading %s -> %s", url, target.name)
+    try:
+        # 用 urlopen + timeout 替代 urlretrieve (urlretrieve 不支持 timeout)
+        with urllib.request.urlopen(url, timeout=60) as resp:
+            with open(bz2_path, "wb") as f:
+                while True:
+                    chunk = resp.read(64 * 1024)
+                    if not chunk:
+                        break
+                    f.write(chunk)
+    except Exception as e:
+        # W9: 保留 bz2 文件, 避免下次重下 100MB
+        log.error("下载失败 (bz2 已保留供重试): %s", e)
+        raise
+    log.info("Decompressing %s ...", target.name)
+    try:
         with bz2.open(bz2_path, "rb") as src, open(target, "wb") as dst:
             dst.write(src.read())
-        bz2_path.unlink()
-        print(f"[INFO] Done: {target} ({target.stat().st_size / 1024 / 1024:.1f} MB)")
+    except Exception as e:
+        log.error("解压失败 (bz2 已保留供重试): %s", e)
+        raise
+    bz2_path.unlink()
+    log.info("Done: %s (%.1f MB)", target, target.stat().st_size / 1024 / 1024)
 
 
 def ensure_models() -> Tuple[Path, Path]:

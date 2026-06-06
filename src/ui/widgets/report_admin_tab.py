@@ -143,10 +143,22 @@ class ReportAdminTab(QWidget):
         self.refresh()
 
     def _clear_canvas(self):
-        """切图表前清空旧 Figure（避免内存泄漏）。"""
+        """切图表前清空旧 Figure (避免内存泄漏)。
+        W9 修复: 显式 plt.close(fig) 释放 matplotlib figure 内存.
+        之前 deleteLater 只删 Qt widget, 但 fig 没 close, 用户切 100 次 chart
+        会累积 figure 内存 (每次 ~1-2 MB → 100 次 ~100-200 MB).
+        """
         if self._canvas is not None:
             self.canvas_layout.removeWidget(self._canvas)
             self._canvas.setParent(None)
+            # 拿到底层 figure 显式 close
+            try:
+                old_fig = self._canvas.figure
+                if old_fig is not None:
+                    import matplotlib.pyplot as plt
+                    plt.close(old_fig)
+            except Exception:
+                pass
             self._canvas.deleteLater()
             self._canvas = None
 
