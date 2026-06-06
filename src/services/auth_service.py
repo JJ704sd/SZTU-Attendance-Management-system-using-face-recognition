@@ -6,6 +6,7 @@ services/auth_service.py — 认证服务
 """
 import re
 
+from src.constants import ROLE_STUDENT, VALID_ROLES
 from src.dao.user_dao import UserDao
 from src.db import session_scope
 from src.models.user import User
@@ -38,9 +39,9 @@ class AuthService:
             raise AuthError("用户名必须是 3-50 位字母/数字/下划线")
         if len(password) < 6:
             raise AuthError("密码至少 6 位")
-        if role not in ("student", "teacher", "lab_admin"):
+        if role not in VALID_ROLES:
             raise AuthError("角色不合法")
-        if role == "student" and not student_id:
+        if role == ROLE_STUDENT and not student_id:
             raise AuthError("学生必须填写学号")
 
         with session_scope() as s:

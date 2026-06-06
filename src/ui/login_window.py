@@ -10,6 +10,7 @@ from PyQt5.QtWidgets import (
 )
 from PyQt5.QtCore import Qt
 
+from src.constants import ROLE_LABELS, ROLE_STUDENT, ROLE_TEACHER, ROLE_LAB_ADMIN
 from src.services.auth_service import AuthService, AuthError
 from src.ui.styles import apply_auth_style
 
@@ -65,9 +66,9 @@ class LoginWindow(QWidget):
         self.password_edit.setPlaceholderText("密码")
         self.password_edit.setEchoMode(QLineEdit.Password)
         self.role_combo = QComboBox()
-        self.role_combo.addItem("学生", "student")
-        self.role_combo.addItem("教师", "teacher")
-        self.role_combo.addItem("实验室管理员", "lab_admin")
+        self.role_combo.addItem(ROLE_LABELS[ROLE_STUDENT], ROLE_STUDENT)
+        self.role_combo.addItem(ROLE_LABELS[ROLE_TEACHER], ROLE_TEACHER)
+        self.role_combo.addItem(ROLE_LABELS[ROLE_LAB_ADMIN], ROLE_LAB_ADMIN)
 
         form.addRow("用户名", self.username_edit)
         form.addRow("密  码", self.password_edit)
@@ -175,13 +176,13 @@ class LoginWindow(QWidget):
 
     def _open_role_window(self, user):
         """登录成功，按角色打开主窗口并关闭登录窗口"""
-        if user.role == "student":
+        if user.role == ROLE_STUDENT:
             from src.ui.student_window import StudentWindow
             self.next_win = StudentWindow(user)
-        elif user.role == "teacher":
+        elif user.role == ROLE_TEACHER:
             from src.ui.teacher_window import TeacherWindow
             self.next_win = TeacherWindow(user)
-        elif user.role == "lab_admin":
+        elif user.role == ROLE_LAB_ADMIN:
             from src.ui.admin_window import AdminWindow
             self.next_win = AdminWindow(user)
         else:
@@ -200,4 +201,4 @@ class LoginWindow(QWidget):
 
     @staticmethod
     def _role_text(role: str) -> str:
-        return {"student": "学生", "teacher": "教师", "lab_admin": "实验室管理员"}.get(role, role)
+        return ROLE_LABELS.get(role, role)

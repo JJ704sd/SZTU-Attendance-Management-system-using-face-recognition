@@ -8,6 +8,7 @@ from PyQt5.QtWidgets import (
 )
 from PyQt5.QtCore import Qt
 
+from src.constants import ROLE_LABELS, ROLE_STUDENT, ROLE_TEACHER, ROLE_LAB_ADMIN
 from src.services.auth_service import AuthService, AuthError
 from src.ui.styles import apply_auth_style
 
@@ -77,9 +78,9 @@ class RegisterWindow(QWidget):
         self.real_name_edit = QLineEdit()
         self.real_name_edit.setPlaceholderText("请填写真实姓名")
         self.role_combo = QComboBox()
-        self.role_combo.addItem("学生", "student")
-        self.role_combo.addItem("教师", "teacher")
-        self.role_combo.addItem("实验室管理员", "lab_admin")
+        self.role_combo.addItem(ROLE_LABELS[ROLE_STUDENT], ROLE_STUDENT)
+        self.role_combo.addItem(ROLE_LABELS[ROLE_TEACHER], ROLE_TEACHER)
+        self.role_combo.addItem(ROLE_LABELS[ROLE_LAB_ADMIN], ROLE_LAB_ADMIN)
         self.student_id_edit = QLineEdit()
         self.student_id_edit.setPlaceholderText("学生必填")
         self.direction_combo = QComboBox()
@@ -148,7 +149,7 @@ class RegisterWindow(QWidget):
 
     def _on_role_changed(self):
         role = self.role_combo.currentData()
-        if role == "student":
+        if role == ROLE_STUDENT:
             self.student_id_edit.setPlaceholderText("学生必填")
             self.direction_combo.setEnabled(True)
         else:

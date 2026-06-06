@@ -48,7 +48,7 @@ class AttendanceService:
     def sign_in_by_face(self, task_id: int, user_id: int,
                         match_distance: float) -> Optional[AttendanceRecord]:
         with session_scope() as s:
-            task = s.query(AttendanceTask).get(task_id)
+            task = s.get(AttendanceTask, task_id)
             if not task or task.status != "open":
                 return None
 
@@ -82,7 +82,7 @@ class AttendanceService:
     def close_task_and_mark_absent(self, task_id: int):
         """end_time 到达后调用，遍历课程学生名单补齐缺勤"""
         with session_scope() as s:
-            task = s.query(AttendanceTask).get(task_id)
+            task = s.get(AttendanceTask, task_id)
             if not task:
                 return
             task.status = "closed"
@@ -129,7 +129,7 @@ class AttendanceService:
 
     def approve_leave(self, leave_id: int, approver_id: int, approved: bool):
         with session_scope() as s:
-            req = s.query(LeaveRequest).get(leave_id)
+            req = s.get(LeaveRequest, leave_id)
             if not req:
                 return
             req.status = "approved" if approved else "rejected"

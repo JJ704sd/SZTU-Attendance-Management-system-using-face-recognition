@@ -165,8 +165,10 @@ class TeacherWindow(QWidget):
 
         self.history_table.setRowCount(len(tasks))
         for i, t in enumerate(tasks):
-            cname = courses.get(t.course_id).course_name if t.course_id in courses else f"#{t.course_id}"
-            rname = rooms.get(t.classroom_id).name if t.classroom_id in rooms else f"#{t.classroom_id}"
+            c_obj = courses.get(t.course_id)
+            r_obj = rooms.get(t.classroom_id)
+            cname = c_obj.course_name if c_obj is not None else f"#{t.course_id}"
+            rname = r_obj.name if r_obj is not None else f"#{t.classroom_id}"
             self.history_table.setItem(i, 0, QTableWidgetItem(str(t.id)))
             self.history_table.setItem(i, 1, QTableWidgetItem(cname))
             self.history_table.setItem(i, 2, QTableWidgetItem(rname))
