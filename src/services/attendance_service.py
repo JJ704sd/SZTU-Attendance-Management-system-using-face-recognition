@@ -52,6 +52,13 @@ class AttendanceService:
             if not task or task.status != "open":
                 return None
 
+            # 防御性: 验证 user 存在 + 角色是 student
+            # 不存在/角色错 返 None, 避免 FK 1452 抛到调用方
+            from src.dao.user_dao import UserDao
+            user = UserDao(s).get(user_id)
+            if not user or user.role != "student":
+                return None
+
             existed = s.query(AttendanceRecord).filter(
                 and_(AttendanceRecord.task_id == task_id,
                      AttendanceRecord.student_id == user_id)
