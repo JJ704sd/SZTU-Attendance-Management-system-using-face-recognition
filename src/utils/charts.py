@@ -12,7 +12,7 @@ W4 Phase 4: 4 类报表图表（学生出勤率柱状 / 趋势折线 / 实验室
 - 不强制 matplotlib backend（测试 offscreen 用 Agg，PyQt embed 用 Qt5Agg，
   让调用方决定）
 """
-from typing import List, Optional
+from typing import List
 
 import matplotlib.dates as mdates
 import matplotlib.pyplot as plt

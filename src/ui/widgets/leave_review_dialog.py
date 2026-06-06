@@ -2,7 +2,6 @@
 ui/widgets/leave_review_dialog.py — 请假审批对话框 (W6 Phase 1)
 老师查看所有 open 任务下的待审批请假, 批/驳一键完成。
 """
-from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QColor
 from PyQt5.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QTableWidget, QTableWidgetItem,

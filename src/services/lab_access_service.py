@@ -20,7 +20,6 @@ W4 Phase 3c: 学生刷脸到实验室门口 → 调 check_access 决定放不放
 import logging
 from dataclasses import dataclass
 from datetime import date
-from typing import Optional
 
 from src.dao.lab_access_log_dao import LabAccessLogDao
 from src.dao.lab_dao import LabDao

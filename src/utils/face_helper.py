@@ -16,7 +16,7 @@ import numpy as np
 import dlib
 
 # 路径单例：dev 是项目根，打包后是 exe 同级目录
-from src.utils.paths import APP_ROOT, MODELS_DIR  # noqa: F401
+from src.utils.paths import MODELS_DIR  # noqa: F401
 
 SHAPE_PREDICTOR_URL = (
     "https://github.com/davisking/dlib-models/raw/master/"

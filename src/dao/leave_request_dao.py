@@ -2,7 +2,7 @@
 dao/leave_request_dao.py — 请假申请 DAO
 W6 Phase 1: leave_request 流程接入
 """
-from typing import List, Optional
+from typing import List
 
 from src.dao.base import BaseDao
 from src.models.attendance import LeaveRequest

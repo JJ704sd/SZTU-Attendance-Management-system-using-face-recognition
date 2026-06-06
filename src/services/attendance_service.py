@@ -133,30 +133,6 @@ class AttendanceService:
                 ))
 
     # -----------------------------------------------------
-    # 请假申请
-    # -----------------------------------------------------
-    def apply_leave(self, student_id: int, task_id: int, reason: str) -> int:
-        with session_scope() as s:
-            req = LeaveRequest(
-                student_id=student_id,
-                task_id=task_id,
-                reason=reason,
-                status="pending",
-            )
-            s.add(req)
-            s.flush()
-            return req.id
-
-    def approve_leave(self, leave_id: int, approver_id: int, approved: bool):
-        with session_scope() as s:
-            req = s.get(LeaveRequest, leave_id)
-            if not req:
-                return
-            req.status = "approved" if approved else "rejected"
-            req.approver_id = approver_id
-            req.approve_time = datetime.now()
-
-    # -----------------------------------------------------
     # 统计辅助
     # -----------------------------------------------------
     def task_summary(self, task_id: int) -> dict:

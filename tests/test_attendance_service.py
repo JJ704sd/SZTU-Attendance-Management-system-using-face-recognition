@@ -4,6 +4,9 @@ tests/test_attendance_service.py — AttendanceService.close_task_and_mark_absen
 W4 Phase 3b 验收:
 - 有 course_enrollment: 只补登选课名单里的学生
 - 无 course_enrollment: 防御性降级到 role='student' 全部
+
+⚠️ fallback 走"role=student 全部"会受任意测试残留的 student 污染。
+  每个测试 run 前 fixture 先清掉所有 student 角色避免 flaky。
 """
 import uuid
 from datetime import datetime, timedelta
@@ -13,10 +16,41 @@ import pytest
 from src.dao.attendance_dao import AttendanceRecordDao, AttendanceTaskDao
 from src.dao.course_enrollment_dao import CourseEnrollmentDao
 from src.db import session_scope
-from src.models.course import Course
 from src.models.user import User
+from src.models.course import Course
 from src.services.attendance_service import AttendanceService
 from src.services.auth_service import AuthService
+
+
+@pytest.fixture(autouse=True)
+def _purge_residual_students():
+    """autouse fixture: 每个测试前清掉 smk_ 前缀的 student 残留,
+    避免 close_task fallback 走'role=student 全部'时受其他测试污染.
+    谨慎: 只清 smk_/sa_/sb_/stu_ 前缀 (W2-W6 测试都用这些), 真业务 student 不动.
+    """
+    import re
+    # 测试前清
+    with session_scope() as s:
+        from src.models.attendance import AttendanceTask, AttendanceRecord, LeaveRequest
+        from src.models.lab import LabAccessLog, LabTraining
+        from src.models.course_enrollment import CourseEnrollment
+        # 找 smk_/sa_/sb_/stu_ 开头的 student
+        residual_students = s.query(User).filter(
+            User.role == "student",
+            User.username.regexp_match("^(smk_|sa_|sb_|stu_|测脸|演示|流程)"),
+        ).all()
+        student_ids = [u.id for u in residual_students]
+        if not student_ids:
+            yield
+            return
+        # 倒序删 FK 依赖 (不删 teacher / lab / course, 避免字段假设错误)
+        s.query(LabAccessLog).filter(LabAccessLog.student_id.in_(student_ids)).delete(synchronize_session=False)
+        s.query(LabTraining).filter(LabTraining.student_id.in_(student_ids)).delete(synchronize_session=False)
+        s.query(LeaveRequest).filter(LeaveRequest.student_id.in_(student_ids)).delete(synchronize_session=False)
+        s.query(AttendanceRecord).filter(AttendanceRecord.student_id.in_(student_ids)).delete(synchronize_session=False)
+        s.query(CourseEnrollment).filter(CourseEnrollment.student_id.in_(student_ids)).delete(synchronize_session=False)
+        s.query(User).filter(User.id.in_(student_ids)).delete(synchronize_session=False)
+    yield
 
 
 def _uni(prefix: str = "u") -> str:

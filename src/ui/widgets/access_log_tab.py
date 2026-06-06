@@ -8,7 +8,6 @@ W4 Phase 5c: lab_access_log 只读查询 UI
 import logging
 from datetime import datetime, timedelta
 
-from PyQt5.QtCore import QDate, Qt
 from PyQt5.QtGui import QColor
 from PyQt5.QtWidgets import (
     QAbstractItemView, QComboBox, QHBoxLayout, QHeaderView, QLabel,

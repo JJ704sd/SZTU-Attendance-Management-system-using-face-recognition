@@ -16,7 +16,6 @@ from typing import List, Optional
 
 from sqlalchemy import and_
 
-from src.dao.attendance_dao import AttendanceRecordDao
 from src.dao.leave_request_dao import LeaveRequestDao
 from src.dao.user_dao import UserDao
 from src.db import session_scope

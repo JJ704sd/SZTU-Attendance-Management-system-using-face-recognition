@@ -6,7 +6,7 @@ W4 Phase 5b: LabTraining 记录的 CRUD UI
 字段不同: student_id + lab_id + training_type + completion/expiry_date + score + instructor_id
 """
 import logging
-from datetime import date, timedelta
+from datetime import date
 from typing import Optional
 
 from PyQt5.QtCore import QDate, Qt
