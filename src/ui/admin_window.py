@@ -4,7 +4,7 @@ ui/admin_window.py — 实验室管理员端主窗口
 W4 Phase 5 接入进度:
 - ✅ Tab 1 实验室管理: CRUD（Phase 5a 完成）
 - ✅ Tab 2 安全培训录入: CRUD（Phase 5b 完成）
-- ⏳ Tab 3 准入日志: 留 placeholder（Phase 5c）
+- ✅ Tab 3 准入日志: 只读 + 筛选（Phase 5c 完成）
 - ⏳ Tab 4 使用率报表: 留 placeholder（Phase 5d）
 
 self.tabs 标准命名（跟 StudentWindow/TeacherWindow 一致）
@@ -61,8 +61,12 @@ class AdminWindow(QWidget):
         self.tab_training = TrainingAdminTab()
         self.tabs.addTab(self.tab_training, "📋 安全培训")
 
-        # Tab 3/4 仍 placeholder（5c/5d 待开）
-        self.tabs.addTab(self._placeholder("🚪 准入日志", "W4 Phase 5c: 实时查看准入记录"), "准入日志")
+        # Tab 3 准入日志（Phase 5c 完成）
+        from src.ui.widgets.access_log_tab import AccessLogTab
+        self.tab_log = AccessLogTab()
+        self.tabs.addTab(self.tab_log, "🚪 准入日志")
+
+        # Tab 4 仍 placeholder（5d 待开）
         self.tabs.addTab(self._placeholder("📊 使用率报表", "W4 Phase 5d: matplotlib 报表"), "使用率报表")
 
         main = QVBoxLayout()
@@ -89,5 +93,6 @@ class AdminWindow(QWidget):
             self.login_win = LoginWindow()
             self.login_win.show()
             self.close()
+
 
 
