@@ -19,7 +19,7 @@ from typing import Optional
 
 import cv2
 import numpy as np
-from PyQt5.QtCore import Qt, QObject, QThread, pyqtSignal, pyqtSlot
+from PyQt5.QtCore import Qt, QObject, QThread, QTimer, pyqtSignal, pyqtSlot
 from PyQt5.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QProgressBar, QMessageBox,
@@ -30,20 +30,28 @@ from src.models.user import User
 
 log = logging.getLogger(__name__)
 
+# 类型前向引用, 避免循环 import
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from src.ui.widgets.camera_widget import CameraWidget
+
 
 class _WorkerCamera:
-    """collect_for_user 需要的最小 camera 接口；worker 持 cap 直读，无 race。"""
-    def __init__(self, cap: cv2.VideoCapture):
-        self._cap = cap
+    """collect_for_user 需要的最小 camera 接口; worker 持 cap 直读, 无 race.
+
+    W12: 改用 CameraWidget.capture_one_frame() (带 _lock 互斥),
+    让 worker 跟主窗 QTimer / dialog preview timer 抢帧时不冲突.
+    """
+    def __init__(self, camera_widget):
+        self._cam_widget = camera_widget
 
     def is_running(self) -> bool:
-        return self._cap is not None and self._cap.isOpened()
+        return self._cam_widget is not None and self._cam_widget.is_running()
 
     def capture_one_frame(self):
-        if self._cap is None or not self._cap.isOpened():
+        if self._cam_widget is None or not self._cam_widget.is_running():
             return None
-        ok, frame = self._cap.read()
-        return frame if ok else None
+        return self._cam_widget.capture_one_frame()  # 带 _lock 互斥
 
 
 class _CollectWorker(QObject):
@@ -52,18 +60,18 @@ class _CollectWorker(QObject):
     finished = pyqtSignal(dict)        # collect_for_user 返回的 dict
     error = pyqtSignal(str)
 
-    def __init__(self, user_id: int, cap: cv2.VideoCapture, n_samples: int,
+    def __init__(self, user_id: int, camera_widget, n_samples: int,
                  stop_event: threading.Event):
         super().__init__()
         self.user_id = user_id
-        self.cap = cap
+        self.camera_widget = camera_widget
         self.n_samples = n_samples
         self.stop_event = stop_event
 
     def run(self):
         try:
             from src.services.face_service import FaceService, _FaceCache
-            camera = _WorkerCamera(self.cap)
+            camera = _WorkerCamera(self.camera_widget)
             result = FaceService().collect_for_user(
                 self.user_id, camera,
                 n_samples=self.n_samples,
@@ -87,18 +95,32 @@ class FaceCollectDialog(QDialog):
 
     成功 accept() / 失败或取消 reject()。"""
 
-    def __init__(self, user: User, parent=None):
+    def __init__(self, user: User, camera_widget: Optional["CameraWidget"] = None, parent=None):
+        """W12: 接受 camera_widget 参数复用主窗的摄像头, 避免双开冲突.
+
+        Args:
+            user: 采集目标用户
+            camera_widget: 主窗的 CameraWidget 实例 (推荐传, 复用 cap 避免
+                跟主窗 register_camera 抢 device 0).
+                None 时兜底自己新建 (此时需要保证主窗的 cam 已 stop).
+        """
         super().__init__(parent)
         self.user = user
         self.saved_count = 0
         self._camera_widget = None
+        self._owns_camera = False  # True=自己新建, 关 dialog 时 release; False=复用主窗, 不 release
         self._thread: Optional[QThread] = None
         self._worker: Optional[_CollectWorker] = None
         self._stop_event: Optional[threading.Event] = None
         self._collecting = False
-        self._init_ui()
+        # W12 v2: 不再开 dialog 自己的 preview timer!
+        # dialog 嵌的是主窗 widget (同一实例), 主窗 timer 渲染一次画面,
+        # 主窗 + dialog 同步显示. dialog 自己的 timer 跟 worker 抢 cap (走 _lock)
+        # 导致 worker 抢到率从 100% 降到 1/3, 30 张里 6 张超时.
+        # 砍掉 dialog timer, 让 worker 独占 _lock 抢帧.
+        self._init_ui(camera_widget)
 
-    def _init_ui(self):
+    def _init_ui(self, camera_widget: Optional["CameraWidget"] = None):
         self.setWindowTitle("人脸采集")
         self.setModal(True)
         self.resize(640, 560)
@@ -114,14 +136,24 @@ class FaceCollectDialog(QDialog):
         intro.setWordWrap(True)
         layout.addWidget(intro)
 
-        # 摄像头预览（含人脸框 overlay）
-        from src.ui.widgets.camera_widget import CameraWidget
-        self._camera_widget = CameraWidget()
-        self._camera_widget.setMinimumSize(480, 360)
-        cam_ok = self._camera_widget.start(0)
-        if cam_ok:
-            self._camera_widget.set_overlay_callback(self._draw_face_boxes)
-        layout.addWidget(self._camera_widget)
+        # W12 修复: 复用主窗 CameraWidget 而非自己 start
+        if camera_widget is not None:
+            self._camera_widget = camera_widget
+            self._owns_camera = False  # 复用主窗的, 关 dialog 时不能 release
+            cam_ok = camera_widget.is_running()
+            if cam_ok:
+                camera_widget.set_overlay_callback(self._draw_face_boxes)
+            layout.addWidget(self._camera_widget)
+        else:
+            # 兜底: 没传 camera_widget 时, 兜底自己新建 (需要主窗 cam 已 stop)
+            from src.ui.widgets.camera_widget import CameraWidget
+            self._camera_widget = CameraWidget()
+            self._camera_widget.setMinimumSize(480, 360)
+            self._owns_camera = True  # 自己新建的, 关 dialog 时要 release
+            cam_ok = self._camera_widget.start(0)
+            if cam_ok:
+                self._camera_widget.set_overlay_callback(self._draw_face_boxes)
+            layout.addWidget(self._camera_widget)
 
         # 状态标签（必须先创建，后面 _set_status 才能用）
         self.status_label = QLabel("")
@@ -188,19 +220,20 @@ class FaceCollectDialog(QDialog):
     def _on_start(self):
         if self._collecting:
             return
-        cap = self._camera_widget.get_cap() if self._camera_widget else None
-        if cap is None or not cap.isOpened():
+        if self._camera_widget is None or not self._camera_widget.is_running():
             QMessageBox.warning(self, "提示", "摄像头未启动，无法采集")
             return
 
-        # 暂停 preview QTimer，腾出 cap 给 worker
-        self._camera_widget.stop()
+        # W12 修复: 不再调 pause_preview() — 让主窗 QTimer 继续跑 (主窗画面正常),
+        # dialog 自己的 preview timer 也跑 (dialog 画面正常),
+        # worker 跑 (30 张采集). 三个都用 _lock 互斥抢帧, 不冲突.
+        # 上一版 pause_preview 会让 dialog 预览变静态 → UX 差.
 
         # 起 worker
         self._stop_event = threading.Event()
         self._thread = QThread(self)
         self._worker = _CollectWorker(
-            self.user.id, cap, Config.FACE_SAMPLE_COUNT, self._stop_event,
+            self.user.id, self._camera_widget, Config.FACE_SAMPLE_COUNT, self._stop_event,
         )
         self._worker.moveToThread(self._thread)
         self._thread.started.connect(self._worker.run)
@@ -271,9 +304,22 @@ class FaceCollectDialog(QDialog):
         # 兜底：dialog 关闭时确保 thread 退出 + 摄像头释放
         if self._collecting and self._stop_event is not None:
             self._stop_event.set()
-        if self._thread is not None and self._thread.isRunning():
-            self._thread.quit()
-            self._thread.wait(3000)
-        if self._camera_widget is not None:
+        if self._thread is not None:
+            # W12 修复: Qt deleteLater 异步删除 C++ 对象, closeEvent 触发时
+            # Python 引用还在但底层已删 → isRunning() 抛 RuntimeError.
+            # 用 sip.isdeleted 检查 + try/except 兜底.
+            try:
+                import sip
+                if sip.isdeleted(self._thread):
+                    self._thread = None
+                elif self._thread.isRunning():
+                    self._thread.quit()
+                    self._thread.wait(3000)
+            except (RuntimeError, ImportError):
+                # sip 不可用 / 对象已删 — 都不影响退出
+                self._thread = None
+        # W12 修复: 只在 owns_camera 时才 release (自己新建的)
+        # 复用主窗的 cap 不能 release, 否则主窗 register_camera 就废了
+        if self._camera_widget is not None and self._owns_camera:
             self._camera_widget.stop()
         super().closeEvent(event)

@@ -3,7 +3,66 @@
 > W7-W11 四轮审计 (36 领域) 后的待办清单.
 > 包含: (1) 还没扫的领域 (2) 项目约束接受的已知风险 (3) 真正需要做的后续工作.
 
-最后更新: 2026-06-06 (W11 收口)
+最后更新: 2026-06-07 (W11 + W12 收口)
+
+## 0. W12 紧急修复 (P0 验收阶段)
+
+W11 收口后 P0 验收发现一批 W11 漏掉的真 bug, W12 全部修了:
+
+### 摄像头启动 / 预览
+
+- [x] **MSMF 句柄冲突** (`cv2.VideoCapture(0)` 跑完 smoke 立即开 GUI 返 -1072873821)
+  → 修法: `start()` 改 MSMF 优先 + 500ms retry + DSHOW fallback (`src/ui/widgets/camera_widget.py`)
+- [x] **截屏 / DWM 重合成时闪退** (cv2 read 抛异常, Qt 段错误)
+  → 修法: `capture_one_frame` / `_on_tick` / `request_render` / `_render_frame` 全 try/except 兜住
+- [x] **dialog 黑屏 (双开摄像头冲突)**
+  → 修法: `FaceCollectDialog` 接受 `camera_widget` 参数复用主窗 cap, 不再自己 start
+- [x] **dialog 预览静态** (`pause_preview` 停了主窗 timer)
+  → 修法: `_on_start` 不调 `pause_preview`, dialog 不开自己的 timer (主窗 timer 跑, dialog 嵌的 widget 同步显示)
+- [x] **dialog 双 timer 抢帧** (主窗 + dialog + worker 三方抢, worker 抢到率 1/3 → 30 张只采 6 张)
+  → 修法: 砍 dialog `_preview_timer`, worker 独占 `_lock`
+- [x] **face_collect_dialog closeEvent RuntimeError** (Qt deleteLater 异步删 C++ 对象, isRunning() 抛)
+  → 修法: 用 `sip.isdeleted` + try/except 兜底
+
+### 色彩处理 (橙变蓝)
+
+- [x] **3 模式色彩显示不一致** (`bgr` / `rgb` 模式显示蓝, `cvt` 对)
+  → 修法: 3 模式实现**统一**走 `cv2.cvtColor(BGR2RGB) + Format_RGB888`, 不依赖 PyQt5 内部行为
+- [x] **UI 误导** (3 模式切换没区别, 但还有按钮让用户以为切了会变)
+  → 修法: 砍按钮, 改成不可点绿标签 `🎨 颜色 OK`
+
+### 业务功能
+
+- [x] **管理员不能删人脸数据** (后端 `FaceService.delete_user_encodings` 有, GUI 没暴露)
+  → 修法: 新 Tab 5 「👤 人脸管理」(`src/ui/widgets/face_admin_tab.py`), 列表 + 一键删 (二次确认 + busy cursor + remove_user O(1))
+- [x] **学生端不能自己管理人脸** (必须找管理员)
+  → 修法: 学生端 Tab 1 加 `🗑 清空我的人脸` 按钮 (`_on_clear_my_face`)
+- [x] **没有演示数据** (课程 + 考勤任务, 学生没法刷脸)
+  → 修法: `scripts/seed_demo_data.py` (course BME201 + 任务 #82)
+- [x] **158 个测试残留用户** (pytest 反复建 u_xxx/s_xxx 留下的)
+  → 修法: `scripts/cleanup_test_users.py` (一键清 190 条)
+
+### 文案 / 状态
+
+- [x] **状态栏显示"采集超时"还是"已注册 49 张"分不清是单轮还是总数**
+  → 修法: 文案改"本轮 30 张目标, 多次采集可累加, 识别率更高"
+- [x] **30 张注册数 = 签名验证要求** 文案不清
+  → 修法: 同上
+
+### 测试
+
+- [x] `tests/test_camera_widget.py` 17 项 (start 后端顺序 + pause/stop + 3 模式 + request_render + worker)
+- [x] `tests/test_face_admin_tab.py` 8 项 (refresh / delete_db / delete_files / remove_user / count)
+- 106/106 测试全过 (之前 82 → 增 24 项)
+
+### 已知遗留 (不修, 用户接受)
+
+- 之前 W11 列的 10 项已知风险 + 1-9 接收项 (N<1000 / GIL / 全表 scan / etc.) 全部继续接受
+- `cycle_color_mode` 标 DEPRECATED 保留作环境变量兼容, UI 不再调
+
+---
+
+## 1. 还没扫的领域 (代码扫描覆盖不到)
 
 ## 1. 还没扫的领域 (代码扫描覆盖不到)
 

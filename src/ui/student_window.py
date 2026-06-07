@@ -16,6 +16,7 @@ Phase 5 重写：3 个真实 Tab + 1 个 W4 占位。
   + recognize（dlib 编码 ~50-100ms 不会完全卡 UI，且只 2 fps）。
 """
 import logging
+import shutil
 from typing import Optional
 
 import numpy as np
@@ -77,6 +78,18 @@ class StudentWindow(QWidget):
         info = QLabel(f"用户名: {self.user.username} | 学号: {self.user.student_id or '—'}")
         info.setStyleSheet("color: gray;")
         top.addWidget(info)
+        # W12: 色彩状态标签 (不可点, 替代之前的 3 模式按钮).
+        # 3 模式实现统一走 cv2.cvtColor, 切换没视觉差异, 砍掉按钮避免误导.
+        self.color_mode_label = QLabel("🎨 颜色 OK")
+        self.color_mode_label.setStyleSheet(
+            "color: #16A34A; padding: 4px 10px; "
+            "background-color: #DCFCE7; border-radius: 4px;"
+        )
+        self.color_mode_label.setToolTip(
+            "摄像头色彩已统一走 cv2.cvtColor(BGR→RGB) 显式转换,\n"
+            "不依赖 PyQt5 内部行为, 显示颜色正确."
+        )
+        top.addWidget(self.color_mode_label)
         self.logout_btn = QPushButton("退出登录")
         self.logout_btn.clicked.connect(self._on_logout)
         top.addWidget(self.logout_btn)
@@ -128,9 +141,18 @@ class StudentWindow(QWidget):
         self.collect_btn = QPushButton("开始采集")
         self.collect_btn.setProperty("role", "primary")
         self.collect_btn.clicked.connect(self._on_start_collect)
+        # W12 v6: 学生端能自己管理人脸数据, 不必找管理员
+        self.clear_my_face_btn = QPushButton("🗑 清空我的人脸")
+        self.clear_my_face_btn.setProperty("role", "danger")
+        self.clear_my_face_btn.setToolTip(
+            "删除你所有已注册的人脸数据 (face_encoding + jpg 图片).\n"
+            "删除后需要重新采集才能签到. 不删账号."
+        )
+        self.clear_my_face_btn.clicked.connect(self._on_clear_my_face)
         btn_row.addWidget(self.open_reg_cam_btn)
         btn_row.addWidget(self.collect_btn)
         btn_row.addStretch()
+        btn_row.addWidget(self.clear_my_face_btn)
         layout.addLayout(btn_row)
 
         layout.addStretch()
@@ -144,22 +166,80 @@ class StudentWindow(QWidget):
             self._set_label_state(self.register_status,
                                   "当前未注册人脸 — 请点击「开始采集」", "neutral")
         elif n < Config.FACE_SAMPLE_COUNT:
+            # W12 v5: 30 张是"单轮目标" (保证单次多样性), 不是"总上限".
+            # 多次采 30+19=49 张是正常的, 多角度多场景更鲁棒.
             self._set_label_state(self.register_status,
-                                  f"已注册 {n} 张（建议 ≥ {Config.FACE_SAMPLE_COUNT} 张以提高识别率）", "neutral")
+                                  f"已注册 {n} 张（本轮 30 张目标，还没采满）— 多次采集可累加，识别率更高", "neutral")
         else:
             self._set_label_state(self.register_status,
-                                  f"已注册 {n} 张 ✓ 可去「刷脸签到」", "success")
+                                  f"已注册 {n} 张 ✓ 多角度多次采更准，可去「刷脸签到」", "success")
 
     def _on_start_collect(self):
         if not self.register_camera.is_running():
             QMessageBox.warning(self, "提示", "请先打开摄像头")
             return
         from src.ui.widgets.face_collect_dialog import FaceCollectDialog
-        dlg = FaceCollectDialog(self.user, parent=self)
+        # W12 修复: 传 register_camera 给 dialog 复用, 避免双开 device 0 冲突
+        dlg = FaceCollectDialog(self.user, camera_widget=self.register_camera, parent=self)
         if dlg.exec_() == QDialog.Accepted:
             QMessageBox.information(self, "成功",
                                     f"注册成功！本次采集 {dlg.saved_count} 张")
             self._refresh_register_status()
+
+    def _on_clear_my_face(self):
+        """W12 v6: 学生端清空自己的人脸数据 (face_encoding + jpg + 缓存).
+
+        不删账号, 只删人脸数据. 跟管理员 Tab 5 用同套逻辑, 但限定 self.user.id.
+        """
+        from PyQt5.QtCore import Qt
+        n_enc = len(self.face_service.load_user_encodings(self.user.id))
+        if n_enc == 0:
+            QMessageBox.information(
+                self, "提示",
+                "你当前没有注册人脸数据, 无需清空。",
+            )
+            return
+        ret = QMessageBox.question(
+            self, "⚠️ 请确认",
+            f"确定要清空 <b>你自己</b> 的 <b>{n_enc}</b> 条人脸数据吗？\n\n"
+            f"会同时:\n"
+            f"  1. 删 face_encoding 表的 {n_enc} 条记录\n"
+            f"  2. 删 dataset/face_images/{self.user.id}/ 下的所有 jpg\n"
+            f"  3. 清 _FaceCache 中你的缓存\n\n"
+            f"账号不会被删除。清空后你需要重新采集才能签到。",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No,  # 默认 No 防误点
+        )
+        if ret != QMessageBox.Yes:
+            return
+
+        # 跟管理员 Tab 5 一样的删除流程, 但用 busy cursor + disable 按钮
+        from PyQt5.QtWidgets import QApplication
+        QApplication.setOverrideCursor(Qt.WaitCursor)
+        self.clear_my_face_btn.setEnabled(False)
+        try:
+            n_db = self.face_service.delete_user_encodings(self.user.id)
+            # 删 jpg 目录
+            user_dir = Config.DATASET_DIR / str(self.user.id)
+            n_files = 0
+            if user_dir.exists():
+                n_files = sum(1 for _ in user_dir.glob("*.jpg"))
+                shutil.rmtree(user_dir, ignore_errors=True)
+            # 清缓存 (只清自己)
+            from src.services.face_service import _FaceCache
+            _FaceCache.get().remove_user(self.user.id)
+            QMessageBox.information(
+                self, "成功",
+                f"已清空 {n_db} 条人脸编码 + {n_files} 个 jpg 文件。\n"
+                f"你现在可以重新采集。",
+            )
+        except Exception as e:
+            log.exception("清空人脸数据失败")
+            QMessageBox.critical(self, "失败", f"清空失败：{e}")
+        finally:
+            QApplication.restoreOverrideCursor()
+            self.clear_my_face_btn.setEnabled(True)
+        self._refresh_register_status()
 
     # ==================================================================
     # Tab 2: 刷脸签到

@@ -6,6 +6,7 @@ W4 Phase 5 接入进度:
 - ✅ Tab 2 安全培训录入: CRUD（Phase 5b完成）
 - ✅ Tab 3 准入日志: 只读 + 筛选（Phase 5c完成）
 - ✅ Tab 4 使用率报表: matplotlib 嵌入 + 4 类图表切换（Phase 5d完成）
+- ✅ Tab 5 用户人脸管理: 删 face_encoding + jpg (W12 新增)
 
 self.tabs 标准命名（跟 StudentWindow/TeacherWindow 一致）
 """
@@ -69,6 +70,11 @@ class AdminWindow(QWidget):
         from src.ui.widgets.report_admin_tab import ReportAdminTab
         self.tab_report = ReportAdminTab()
         self.tabs.addTab(self.tab_report, "📊 使用率报表")
+
+        # W12: Tab 5 用户人脸管理
+        from src.ui.widgets.face_admin_tab import FaceAdminTab
+        self.tab_face = FaceAdminTab()
+        self.tabs.addTab(self.tab_face, "👤 人脸管理")
 
         main = QVBoxLayout()
         main.addLayout(top)
