@@ -37,31 +37,6 @@ from PyQt5.QtWidgets import QLabel, QSizePolicy, QVBoxLayout, QWidget
 
 log = logging.getLogger(__name__)
 
-# W12: 3 种色彩模式 (按 CAMERA_COLOR_MODE 环境变量选, 但实现已统一, 见 _bgr_to_qimage)
-COLOR_MODES = ("bgr", "rgb", "cvt")
-
-
-def cycle_color_mode() -> str:
-    """DEPRECATED W12: 循环切换 CAMERA_COLOR_MODE, 返回新模式名 + log.
-
-    之前 UI 学生窗 / 采集 dialog 调, 用来切换 3 模式.
-    现在 3 模式实现统一走 cv2.cvtColor (不依赖 PyQt5 内部行为),
-    切换无视觉差异 → UI 砍了按钮, 不再调用此函数.
-
-    保留此函数:
-    - 给未来调试留口子 (手动设环境变量)
-    - 给已部署用户兼容 (旧 .env 设过 CAMERA_COLOR_MODE 不会报错)
-    """
-    cur = os.getenv("CAMERA_COLOR_MODE", "bgr").lower()
-    try:
-        idx = COLOR_MODES.index(cur)
-    except ValueError:
-        idx = 0
-    new = COLOR_MODES[(idx + 1) % len(COLOR_MODES)]
-    os.environ["CAMERA_COLOR_MODE"] = new
-    log.info("W12: CAMERA_COLOR_MODE 切换: %s → %s", cur, new)
-    return new
-
 
 class CameraWidget(QWidget):
     frame_ready = pyqtSignal(np.ndarray)  # BGR frame, shape (H, W, 3)

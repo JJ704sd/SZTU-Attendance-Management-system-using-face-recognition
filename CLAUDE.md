@@ -49,9 +49,9 @@ pytest tests/ --tb=long
 ```
 src/
 ├── ui/        ← PyQt5 窗口（login / register / student / teacher / admin + widgets/）
-├── services/  ← 业务逻辑（auth_service / attendance_service；face/lab_access/report 待 W3-W4）
-├── dao/       ← SQLAlchemy 数据访问（base / user / course / classroom / attendance）
-├── models/    ← ORM 模型（10 张表的 Python 类，对应 db/schema.sql）
+├── services/ ← 业务逻辑（auth / attendance / face / lab_access / leave / report，6 个）
+├── dao/ ← SQLAlchemy 数据访问（12 个：base/user/login_attempt/face/course/classroom/enrollment/attendance/leave/lab/training/access_log）
+├── models/ ← ORM 模型（12 张表的 Python 类，对应 db/schema.sql）
 ├── db.py      ← SQLAlchemy engine + session_scope() 上下文
 ├── config.py  ← 读 .env，提供 Config 单例
 └── utils/     ← crypto（bcrypt）、face_helper（dlib 封装）
@@ -91,41 +91,45 @@ src/
 | 目录 | 是什么 |
 |---|---|
 | `src/` | **本项目代码**（4 层架构） |
-| `db/schema.sql` | MySQL DDL（10 张表，utf8mb4） |
+| `db/schema.sql` | MySQL DDL（12 张表，utf8mb4） |
 | `docs/` | 设计文档（PROJECT_PLAN / ARCHITECTURE / STRUCTURE / DEVELOPMENT / DATABASE / WORKFLOWS / TEAM_AND_TIMELINE） |
-| `docs/superpowers/plans/` | 实施计划（按 writing-plans skill 格式）。当前最新：`2026-06-04-W3-face-recognition.md`（W3 6 阶段计划，估时 4.5 天，截止 2026-06-07） |
-| `tests/` | 单元测试（25/25 全过，0 warning；含 1 项 dtype 回归 + 1 项 collect_for_user 死循环回归） |
-| `scripts/` | 运维脚本（init_db / run_dev） |
-| `reference/patelrahul4884/` | **原项目参考代码**，**不被 import**，仅作对比 |
+| `docs/superpowers/plans/` | 实施计划（按 writing-plans skill 格式）。当前最新：`2026-06-08-W12-P0-fixes.md`（W12 P0 验收修复 + W13+ 课程交付计划，截止2026-06-20） |
+| `tests/` | 单元测试（**106/106** 全过，0 warning；含1 项 dtype 回归 +1 项 collect_for_user 死循环回归 + W12 新增24 项 camera/admin_tab 覆盖） |
+| `scripts/` | 运维 + 烟测脚本（init_db / run_dev / seed_demo_data / cleanup_test_users / smoke_full_flow / smoke_real_face / smoke_ui_qtest / smoke_e2e） |
+| `dist/` `build/` | PyInstaller onedir打包产物（git ignore，不入库） |
 | `models/` | dlib 模型权重（git ignore，运行时下载） |
 | `dataset/` | 人脸采集图片（git ignore，运行时生成） |
 
 ## 角色与权限
 
 3 种角色，登录后由 `src/ui/login_window.py::_open_role_window()` 路由：
-- `student` → `StudentWindow`（占位，W3 接入刷脸签到）
+- `student` → `StudentWindow`（**已完整**：人脸注册 / 刷脸签到 / 我的考勤 / 我的请假，4 Tab）
 - `teacher` → `TeacherWindow`（**已完整**：发起考勤 / 历史考勤 / 任务详情 / 改密）
-- `lab_admin` → `AdminWindow`（占位，W4 接入实验室 CRUD + 安全培训）
+- `lab_admin` → `AdminWindow`（**已完整**：实验室 CRUD / 安全培训 / 准入日志 / 使用率报表 / 人脸管理，5 Tab）
 
 测试账号：`.env` 配好后跑 `pytest tests/test_auth_service.py` 会自动创建大量测试账号；也可以手动建 `test001/123456`（学生）和 `teacher01/123456`（教师）。
 
 ## 当前进度
 
-**W3 Phase 1-3 完成，Phase 4-6 待执行。**
+**W12收口完成；课程交付物（报告 / PPT /演示视频 / .zip）尚未做，截止2026-06-20。**
 
-- ✅ W2 末：登录注册、教师端 4 个 tab 完整流程、10 张表 + 3 角色
-- ✅ UI 美化：新增 `src/ui/styles.py` 全局 QSS（深藏青色 + 主按钮 + 状态标签），登录/注册/学生/教师窗均已套样式
-- ✅ W3 Phase 1：`src/dao/face_dao.py` + `src/services/face_service.py`（编码序列化 / 单条 CRUD / 全量加载）
-- ✅ W3 Phase 2：`src/ui/widgets/camera_widget.py`（cv2 + QTimer 30ms + `capture_one_frame` 带锁）
-- ✅ W3 Phase 3：`face_service.collect_for_user` 采集编排（连续无脸超时退出 + 进度回调 + 落盘+入库）
-- ✅ 25/25 单测全过，0 warning；新增 `tests/test_face_service.py`（7 项，含死循环回归）
-- ✅ P0/P1 遗留 bug 全部修完：
-  - face_helper dtype 锁 float32（`test_face_encodings_dtype_is_float32`）
-  - SQLAlchemy 2.0 兼容
-  - `welcome_suffix` 修复"测试同学 同学"/"老师 老师"重复后缀
-  - `collect_for_user` 死循环（face_encodings 返回 [] 时不计数）→ 已改为 `consecutive_no_progress` 三种失败模式都计数
-- 📋 W3 详细计划：[`docs/superpowers/plans/2026-06-04-W3-face-recognition.md`](docs/superpowers/plans/2026-06-04-W3-face-recognition.md)
-- ❌ 待做：W3 Phase 4（recognize service + `_FaceCache`）、Phase 5（学生端 3 tab 重写）、Phase 6（smoke_face.py + E2E 文档）；W4（实验室管理 + 报表）；W5（PyInstaller）；W6（报告 PPT）
+完整11 周迭代 (W2 → W12)：
+
+- ✅ **W2**：登录注册、教师端4 tab +10 张表 +3角色
+- ✅ **W3**：人脸识别全链路（face_service + _FaceCache + CameraWidget + 学生端4 tab + smoke_face）
+- ✅ **W4**：实验室准入7 分支 + 安全培训 +准入日志 +4 类 matplotlib图表
+- ✅ **W5**：PyInstaller onedir380 MB 真一键 exe + smoke_e2e
+- ✅ **W6**：leave_request完整流程（学生申请 / 教师审批）+4 个 smoke脚本
+- ✅ **W7**：完整 bug审计（9死 import +2死方法 +1排序 tie-break +1 测试污染）
+- ✅ **W8**：closeEvent资源泄漏修复 + 注册字段长度校验
+- ✅ **W9**：CameraWidget bool lock + face_collect 不 accept + 双摄像头冲突
+- ✅ **W10**：matplotlib内存 + dlib 下载超时
+- ✅ **W11**：int/float/env转换 +20领域系统扫
+- ✅ **W12**：P0验收修复12 真 bug +2业务功能（管理员人脸管理 + 学生清自己人脸）
+- ✅ 测试：**106/106** 全过，0 warning；含1 项 dtype回归 +1 项 collect_for_user死循环回归 + W12 新增24 项
+- ✅ Smoke：4 个脚本（full_flow / real_face / ui_qtest / e2e）全过
+- ✅ GitHub：47 commit 已推 main
+- 📋 下一步：W13+课程交付物（报告 PDF /答辩 PPT /演示视频 /提交物 .zip），详 `docs/superpowers/plans/2026-06-08-W12-P0-fixes.md`
 
 ## W3 Phase 5 学生端接入时必踩的坑
 

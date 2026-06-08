@@ -233,26 +233,6 @@ def test_bgr_to_qimage_all_three_modes_unified(qapp):
     )
 
 
-def test_cycle_color_mode_cycles_bgr_rgb_cvt(qapp):
-    """cycle_color_mode 在 bgr→rgb→cvt→bgr 循环."""
-    import os
-    from src.ui.widgets.camera_widget import cycle_color_mode
-    os.environ["CAMERA_COLOR_MODE"] = "bgr"
-    assert cycle_color_mode() == "rgb"  # bgr → rgb
-    assert cycle_color_mode() == "cvt"  # rgb → cvt
-    assert cycle_color_mode() == "bgr"  # cvt → bgr
-    assert cycle_color_mode() == "rgb"  # bgr → rgb (循环)
-
-
-def test_cycle_color_mode_handles_invalid_initial():
-    """环境变量设成无效值时, cycle_color_mode 回到 rgb (W12 默认)."""
-    import os
-    from src.ui.widgets.camera_widget import cycle_color_mode
-    os.environ["CAMERA_COLOR_MODE"] = "garbage"
-    assert cycle_color_mode() == "rgb"  # 找不到 garbage → idx=0 → 下一个是 rgb
-
-
-# =============================================================================
 # W12: request_render() 公开方法 (dialog preview timer 用)
 # =============================================================================
 def test_request_render_calls_capture_and_render(qapp):

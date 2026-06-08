@@ -55,7 +55,7 @@ python -m src.main
 ## 验收
 
 ```bash
-# 单元测试 (82 项)
+# 单元测试 (106 项)
 .venv\Scripts\python.exe -m pytest tests/ -q
 
 # 4 个 smoke 脚本
@@ -100,7 +100,7 @@ pyinstaller build.spec
 │   ├── ui/                    ← PyQt5 表现层
 │   └── utils/                 ← 工具 (dlib/paths/charts/crypto)
 │
-├── tests/                     ← 单元测试 (82 项)
+├── tests/                     ← 单元测试 (106 项)
 │
 ├── scripts/                   ← 运维 / 烟测
 │   ├── init_db.py
@@ -115,4 +115,4 @@ pyinstaller build.spec
 
 ## 提交记录
 
-`git log --oneline` —— W2 → W8 共 17 个 commit (5 个 W3 + 5 个 W4 + 5 个 W5 + 1 个 W6 plan + 5 个 W6 commits + 1 个 W7 + 1 个 W8)。
+`git log --oneline` —— W2 → W12 共47 个 commit (W3-W12 六轮迭代: face 识别 / 实验室准入 / 报表 / 打包 / leave /5 次审计)。
