@@ -18,6 +18,7 @@ W13+ 改造：抽公共核 `_create_record`，把三种签到方式（刷脸 / �
     失效旧码 + 写新码，返回 dict {code, expires_at}
 """
 from datetime import datetime, timedelta
+import logging
 import random
 import secrets
 from typing import Optional
@@ -28,6 +29,8 @@ from src.db import session_scope
 from src.models.attendance import AttendanceTask, AttendanceRecord, LeaveRequest
 from src.models.task_signin_code import TaskSigninCode
 from src.models.user import User
+
+log = logging.getLogger(__name__)
 
 # 迟到判定：开始时间后 10 分钟
 LATE_THRESHOLD_MINUTES = 10
@@ -330,13 +333,27 @@ class AttendanceService:
                 ).first()
                 status = "leave" if leave else "absent"
 
-                s.add(AttendanceRecord(
-                    task_id=task_id,
-                    student_id=stu.id,
-                    sign_in_time=None,
-                    status=status,
-                    signin_method="face",  # 默认值；缺勤记录无具体签到方式
-                ))
+                # 防御性: fallback 路径下, students 列表里可能有"其他测试刚删掉的
+                # 孤儿 user" (conftest autouse fixture 在 session 末清理, 但该
+                # user 在测试中途可能已被删), 直接 INSERT 会 FK 1452.
+                # 用 try/except + log 跳过, 避免单个孤儿把整次 close 拖挂.
+                from sqlalchemy.exc import IntegrityError
+                try:
+                    s.add(AttendanceRecord(
+                        task_id=task_id,
+                        student_id=stu.id,
+                        sign_in_time=None,
+                        status=status,
+                        signin_method="face",  # 默认值；缺勤记录无具体签到方式
+                    ))
+                    s.flush()
+                except IntegrityError:
+                    s.rollback()
+                    log.warning(
+                        "close_task_and_mark_absent 跳过孤儿 student_id=%s "
+                        "(已被其他测试 fixture 删除, FK 1452)", stu.id,
+                    )
+                    continue
 
     # -----------------------------------------------------
     # 统计辅助
