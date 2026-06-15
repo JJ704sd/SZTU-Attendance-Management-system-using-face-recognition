@@ -267,7 +267,7 @@ class FaceCollectDialog(QDialog):
             # (之前注释说"不立即 accept, 让用户看完进度" 是反 UX:
             #  状态栏/进度条已经能告诉用户结果, 关 dialog 后 student_window
             #  不刷新注册状态, 学生不知道采集成功)
-            from PyQt5.QtCore import QTimer
+            from PyQt5.QtCore import Qt, QTimer
             QTimer.singleShot(1500, self.accept)
         else:
             err = result.get("error", "未知错误")
