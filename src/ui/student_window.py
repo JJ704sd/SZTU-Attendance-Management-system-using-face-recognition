@@ -1,13 +1,23 @@
 """
 ui/student_window.py — 学生端主窗口
 
-Phase 5 重写：3 个真实 Tab + 1 个 W4 占位。
-
+W2-W12 历程：
 - Tab 1 人脸注册：CameraWidget + 人脸框 + 弹 FaceCollectDialog
 - Tab 2 刷脸签到：open 任务下拉 + 500ms QTimer 抓帧 + recognize
                  + sign_in_by_face；状态实时显示
 - Tab 3 我的考勤：QTableWidget 查本人记录，状态着色
-- Tab 4 我的实验室：占位 W4 接入
+- Tab 4 我的请假：leave_request 学生申请 + 历史查询
+
+W13+ 改造（track-b-student-ui）：
+- Tab 2 改成分段控件 (QTabWidget 子 Tab)：
+    - 子 Tab 0 「🤳 刷脸签到」   → 沿用原 _on_signin_tick / sign_in_by_face 链路
+    - 子 Tab 1 「🔢 数字码签到」 → DigitSigninWidget
+    - 子 Tab 2 「📷 二维码签到」 → QrScanWidget
+- 任务下拉保持在外层，三个子 Tab 共享同一 task_id.
+- 三种签到方式「先到先签」：监听 DigitSigninWidget.signin_succeeded /
+  QrScanWidget.signin_succeeded / 刷脸成功 → 在外层 disable 整个子 QTabWidget
+  并顶部提示「你已签到 (xxx 方式)」.
+- 换任务时三个子 Tab 都要重新初始化（reset_for_new_task）.
 
 ⚠️ 跨线程安全（CLAUDE.md 警告）：
 - recognize() 走 _FaceCache.get() 单例，调用方在主线程，安全。
@@ -36,6 +46,8 @@ from src.utils.face_helper import face_encodings, face_locations
 from src.models.user import User
 from src.ui.styles import welcome_suffix
 from src.ui.widgets.camera_widget import CameraWidget
+from src.ui.widgets.digit_signin_widget import DigitSigninWidget
+from src.ui.widgets.qr_scan_widget import QrScanWidget
 
 log = logging.getLogger(__name__)
 
@@ -55,12 +67,25 @@ class StudentWindow(QWidget):
         self.face_service = FaceService()
         self.attendance_service = AttendanceService()
 
+        # W13+: 提前创建刷脸 CameraWidget (原 W12 是在 _build_signin_tab 里 new 的,
+        # 现在拆到子 Tab 里, 但 _open_camera / _cleanup_resources / _on_start_signin
+        # 都需要引用 self.signin_camera —— 必须在构造时 new, 避免 AttributeError).
+        self.signin_camera = CameraWidget()
+        # 任务下拉占位引用 —— 真实控件在 _build_signin_tab 里 new 后赋值.
+        self.task_combo: Optional[QComboBox] = None
+
         # Tab 2 签到状态
         self._current_task_id: Optional[int] = None
         self._signing_in = False
         self._signin_timer = QTimer(self)
         self._signin_timer.setInterval(500)  # 2 fps
         self._signin_timer.timeout.connect(self._on_signin_tick)
+        # W13+: 三种签到方式「先到先签」追踪（None / 'face' / 'digit' / 'qr'）
+        # 签到成功后置位, 父窗口 disable 整个 signin_subtabs 并顶部提示.
+        self._signed_in_method: Optional[str] = None
+        # 内部锁: _on_sub_signin_succeeded 调 _refresh_open_tasks 时置位, 防止
+        # _on_task_changed 误把 banner / subtabs 灰显状态清掉.
+        self._signed_in_lock: bool = False
 
         self._init_ui()
 
@@ -97,7 +122,7 @@ class StudentWindow(QWidget):
         # Tab
         self.tabs = QTabWidget()
         self.tabs.addTab(self._build_register_tab(), "人脸注册")
-        self.tabs.addTab(self._build_signin_tab(),   "刷脸签到")
+        self.tabs.addTab(self._build_signin_tab(),   "签到（刷脸/数字码/二维码）")
         self.tabs.addTab(self._build_my_attendance_tab(), "我的考勤")
         self.tabs.addTab(self._build_leave_tab(),    "我的请假")
         # Tab 切换时刷新对应数据
@@ -242,26 +267,135 @@ class StudentWindow(QWidget):
         self._refresh_register_status()
 
     # ==================================================================
-    # Tab 2: 刷脸签到
+    # Tab 2: 签到（刷脸 / 数字码 / 二维码 三种方式）
     # ==================================================================
     def _build_signin_tab(self) -> QWidget:
+        """W13+ 改造: Tab 2 内部再嵌一个 QTabWidget (子 Tab 0/1/2 = 刷脸/数字码/二维码).
+
+        任务下拉 + 刷新按钮放外层, 三个子 Tab 共享同一 task_id.
+        三个子 Tab 互相独立, 通过监听 signin_succeeded 信号做「先到先签」灰显.
+        """
         page = QWidget()
         layout = QVBoxLayout()
 
-        # 任务下拉
+        # ===== 顶部: 任务下拉 + 「你已签到」提示 =====
+        top_row = QVBoxLayout()
         task_row = QHBoxLayout()
         task_row.addWidget(QLabel("考勤任务:"))
         self.task_combo = QComboBox()
         self.task_combo.setMinimumWidth(300)
+        self.task_combo.currentIndexChanged.connect(self._on_task_changed)
         task_row.addWidget(self.task_combo)
         refresh_btn = QPushButton("刷新")
         refresh_btn.clicked.connect(self._refresh_open_tasks)
         task_row.addWidget(refresh_btn)
         task_row.addStretch()
-        layout.addLayout(task_row)
+        top_row.addLayout(task_row)
 
-        # 摄像头
-        self.signin_camera = CameraWidget()
+        # 「你已签到」横幅（默认隐藏）
+        self.signed_in_banner = QLabel("")
+        self.signed_in_banner.setProperty("role", "status")
+        self.signed_in_banner.setProperty("state", "success")
+        self.signed_in_banner.setStyleSheet(
+            "color: white; background-color: #16A34A; "
+            "padding: 8px 14px; border-radius: 6px; font-weight: bold; font-size: 13px;"
+        )
+        self.signed_in_banner.setVisible(False)
+        top_row.addWidget(self.signed_in_banner)
+        layout.addLayout(top_row)
+
+        # ===== 中部: 子 QTabWidget (刷脸 / 数字码 / 二维码) =====
+        # 三个子 Tab widget 延迟构造: 等用户选 task 后再创建 (依赖 task_id).
+        self.signin_subtabs = QTabWidget()
+        # 三个 placeholder 页面 —— 在 _refresh_open_tasks 里首次构造后会替换.
+        self._face_tab_idx = -1
+        self._digit_tab_idx = -1
+        self._qr_tab_idx = -1
+        self._face_tab: Optional[QWidget] = None
+        self._digit_widget: Optional[DigitSigninWidget] = None
+        self._qr_widget: Optional[QrScanWidget] = None
+        # 先放 3 个占位 page (QLabel), 等 _refresh_open_tasks 真正拿到 task_id 后再 rebuild.
+        placeholder = QLabel("请先在上方选择任务")
+        placeholder.setAlignment(Qt.AlignCenter)
+        placeholder.setStyleSheet("color: gray; padding: 60px;")
+        for i, name in enumerate(["🤳 刷脸签到", "🔢 数字码签到", "📷 二维码签到"]):
+            self.signin_subtabs.addTab(placeholder, name)
+        layout.addWidget(self.signin_subtabs)
+
+        layout.addStretch()
+        page.setLayout(layout)
+        self._refresh_open_tasks()
+        return page
+
+    def _on_task_changed(self, _idx: int):
+        """任务下拉变化 → 重建/重置三个子 Tab widget, 取消「已签到」标记.
+
+        W13+: _signed_in_lock 用于防御 _refresh_open_tasks 在签到成功后被调时,
+        误重置 banner + 重新 enable subtabs. 设置了 lock 就只同步 _current_task_id
+        + rebuild, 不动 banner / 灰显状态.
+        """
+        task_id = self.task_combo.currentData()
+        if task_id == self._current_task_id:
+            return
+        self._current_task_id = task_id
+        # 切换任务 = 新一轮签到, 清掉「先到先签」状态
+        # (除非在 signed_in_lock 期间 —— 此时是 _refresh_open_tasks 内部触发, 不重置)
+        if not getattr(self, "_signed_in_lock", False):
+            self._signed_in_method = None
+            self.signed_in_banner.setVisible(False)
+            self.signin_subtabs.setEnabled(True)
+        if task_id is None:
+            return
+        # 重建三个子 Tab 内容 (首次) 或 reset 现有 (换任务)
+        self._rebuild_signin_subtabs(task_id)
+
+    def _rebuild_signin_subtabs(self, task_id: int):
+        """按 task_id 重新初始化三个子 Tab widget.
+
+        首次调用: 三个子 Tab 是占位 QLabel, 替换成真实 widget.
+        后续调用: 子 Tab 已存在, 调 reset_for_new_task() 即可 (保留 camera/timer 状态).
+        """
+        if self._face_tab is None:
+            # 首次: 构造刷脸 Tab 内容（CameraWidget + 控制按钮）
+            self._face_tab = self._build_face_signin_page(task_id)
+            self._digit_widget = DigitSigninWidget(
+                self, task_id, self.user.id, self.attendance_service)
+            self._qr_widget = QrScanWidget(
+                self, task_id, self.user.id, self.attendance_service)
+
+            # 替换占位 page —— 从后往前 remove 避免 index 偏移
+            # (3 个 placeholder 共用同一 QLabel 实例, addTab 重复引用同一个 widget)
+            while self.signin_subtabs.count() > 0:
+                self.signin_subtabs.removeTab(self.signin_subtabs.count() - 1)
+            # 按顺序插入真实 widget
+            self._face_tab_idx = self.signin_subtabs.addTab(self._face_tab, "🤳 刷脸签到")
+            self._digit_tab_idx = self.signin_subtabs.addTab(self._digit_widget, "🔢 数字码签到")
+            self._qr_tab_idx = self.signin_subtabs.addTab(self._qr_widget, "📷 二维码签到")
+
+            # 连 signin_succeeded 信号到父窗口, 统一处理「先到先签」灰显
+            self._digit_widget.signin_succeeded.connect(self._on_sub_signin_succeeded)
+            self._qr_widget.signin_succeeded.connect(self._on_sub_signin_succeeded)
+        else:
+            # 后续换任务: reset 三个子 Tab
+            if self._digit_widget is not None:
+                self._digit_widget.reset_for_new_task(task_id)
+            if self._qr_widget is not None:
+                self._qr_widget.reset_for_new_task(task_id)
+            # 刷脸 Tab 内 task_id 来自 task_combo 重新读, 不需要 reset_for_new_task
+            # (它每次 _on_signin_tick 都读 self._current_task_id, 实时跟随)
+
+    def _build_face_signin_page(self, task_id: int) -> QWidget:
+        """刷脸签到子 Tab 的页面构造.
+
+        把原 _build_signin_tab 里的刷脸 UI 整段搬过来, 引用外层 self.signin_camera /
+        self.open_signin_cam_btn / self.start_signin_btn / self.stop_signin_btn /
+        self.signin_status, 这些属性保持在 StudentWindow 上, 避免改动 _on_signin_tick
+        / _on_start_signin / _on_stop_signin / _open_camera / _close_camera.
+        """
+        page = QWidget()
+        layout = QVBoxLayout()
+
+        # 摄像头 (已在 __init__ 创建 self.signin_camera, 这里直接 add 进来 + 配 overlay)
         self.signin_camera.setMinimumSize(480, 360)
         self.signin_camera.set_overlay_callback(self._draw_face_boxes)
         layout.addWidget(self.signin_camera)
@@ -291,23 +425,76 @@ class StudentWindow(QWidget):
 
         layout.addStretch()
         page.setLayout(layout)
-        self._refresh_open_tasks()
+        # 提示当前 task_id
+        self.signin_status.setText(f"就绪 — 当前任务 #{task_id}，点击「开始签到」")
         return page
+
+    def _on_sub_signin_succeeded(self, record):
+        """DigitSigninWidget / QrScanWidget 发 signin_succeeded 时调用.
+
+        父窗口统一处理: 顶部 banner + disable 子 QTabWidget, 避免重复签到.
+        """
+        if self._signed_in_method is not None:
+            # 已经签过 (刷脸成功后又收到数字码/二维码 signal) —— 防御
+            return
+        method_label = {
+            "face": "刷脸", "digit": "数字码", "qr": "二维码",
+        }.get(record.signin_method, record.signin_method)
+        self._signed_in_method = record.signin_method
+        self.signed_in_banner.setText(
+            f"✅ 你已签到（{method_label}方式）— {record.sign_in_time:%H:%M:%S}，状态: {record.status}"
+        )
+        self.signed_in_banner.setVisible(True)
+        # 停掉所有可能的后台活动
+        if self._signing_in:
+            self._on_stop_signin()
+        # 灰显整个子 QTabWidget —— 三种方式都不可再签
+        self.signin_subtabs.setEnabled(False)
+        # 任务可能因签到而从 open 列表移除 → 刷新下拉.
+        # 用 _signed_in_lock 防止 _on_task_changed 误把 banner / subtabs 状态重置.
+        self._signed_in_lock = True
+        try:
+            self._refresh_open_tasks()
+        finally:
+            self._signed_in_lock = False
+        # _refresh_open_tasks 末尾调了 _on_task_changed, 可能把 subtabs enable 了,
+        # 重新 disable + 把 banner 显示回来.
+        self.signin_subtabs.setEnabled(False)
+        self.signed_in_banner.setVisible(True)
+
 
     def _refresh_open_tasks(self):
         from src.dao.attendance_dao import AttendanceTaskDao
         with session_scope() as s:
             tasks = AttendanceTaskDao(s).find_open_tasks()
 
-        self.task_combo.clear()
-        if not tasks:
-            self.task_combo.addItem("（暂无 open 任务）", None)
-            self.start_signin_btn.setEnabled(False)
+        # W13+: 刷新前先 block 信号, 避免 clear() 触发 currentIndexChanged(None)
+        # 把 subtabs 弄成「无任务」空状态, 然后 addItem() 又触发一次 change.
+        # 这里靠 _on_task_changed 内部比较 current vs _current_task_id 已经去重,
+        # 但 block 更干净.
+        self.task_combo.blockSignals(True)
+        try:
+            self.task_combo.clear()
+            if not tasks:
+                self.task_combo.addItem("（暂无 open 任务）", None)
+            else:
+                for t in tasks:
+                    label = f"任务 #{t.id} - {t.start_time:%m-%d %H:%M} ~ {t.end_time:%H:%M}"
+                    self.task_combo.addItem(label, t.id)
+        finally:
+            self.task_combo.blockSignals(False)
+
+        # start_signin_btn / open_signin_cam_btn 在 _build_face_signin_page 之前不存在
+        if not hasattr(self, "start_signin_btn"):
             return
-        self.start_signin_btn.setEnabled(True)
-        for t in tasks:
-            label = f"任务 #{t.id} - {t.start_time:%m-%d %H:%M} ~ {t.end_time:%H:%M}"
-            self.task_combo.addItem(label, t.id)
+        if not tasks:
+            self.start_signin_btn.setEnabled(False)
+        else:
+            self.start_signin_btn.setEnabled(True)
+
+        # 显式触发一次 _on_task_changed, 让 subtabs 根据当前选项初始化
+        # (addItem 第一项 = 第一个 task, currentIndex=0, _on_task_changed 会拿到 task_id)
+        self._on_task_changed(self.task_combo.currentIndex())
 
     def _on_start_signin(self):
         task_id = self.task_combo.currentData()
@@ -383,8 +570,8 @@ class StudentWindow(QWidget):
                               "success")
         QMessageBox.information(self, "成功",
                                 f"签到成功！\n状态: {record.status}\n距离: {distance:.4f}")
-        # 任务可能因签到而从 open 列表移除 → 刷新下拉
-        self._refresh_open_tasks()
+        # W13+: 走统一的「先到先签」灰显流程 (banner + disable subtabs + 刷新任务下拉)
+        self._on_sub_signin_succeeded(record)
 
     # ==================================================================
     # Tab 3: 我的考勤
@@ -601,13 +788,30 @@ class StudentWindow(QWidget):
     # 退出登录 / 关闭窗口
     # ==================================================================
     def _cleanup_resources(self):
-        """释放摄像头 + 签到 timer (closeEvent + _on_logout 都会调)."""
+        """释放摄像头 + 签到 timer (closeEvent + _on_logout 都会调).
+
+        W13+: 三个子 Tab 都要清理——
+            - 刷脸: self.signin_camera (共用 CameraWidget)
+            - 数字码: 无 timer/camera
+            - 二维码: self._qr_widget.camera + scan timer (子 widget 的 closeEvent 会兜底,
+              这里额外显式调一次防御)
+        """
         if self._signing_in:
             self._on_stop_signin()
-        if self.register_camera.is_running():
+        if hasattr(self, "register_camera") and self.register_camera.is_running():
             self.register_camera.stop()
-        if self.signin_camera.is_running():
+        if hasattr(self, "signin_camera") and self.signin_camera.is_running():
             self.signin_camera.stop()
+        # W13+: 二维码子 Tab 的 timer + 独立 camera
+        if self._qr_widget is not None:
+            try:
+                # 子 widget 自己的 closeEvent 已经在父 close 链里被调, 但显式再 stop 一次
+                # 保证 timer 一定停 (防御 Qt delete 顺序问题).
+                self._qr_widget._stop_scan_internal()
+                if self._qr_widget.camera.is_running():
+                    self._qr_widget.camera.stop()
+            except Exception:
+                log.exception("cleanup _qr_widget 异常")
 
     def closeEvent(self, event):
         """用户点 X 关窗时自动调用, 避免摄像头/timer 资源泄漏."""

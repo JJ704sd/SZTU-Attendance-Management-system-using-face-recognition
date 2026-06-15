@@ -50,8 +50,8 @@ pytest tests/ --tb=long
 src/
 ├── ui/        ← PyQt5 窗口（login / register / student / teacher / admin + widgets/）
 ├── services/ ← 业务逻辑（auth / attendance / face / lab_access / leave / report，6 个）
-├── dao/ ← SQLAlchemy 数据访问（12 个：base/user/login_attempt/face/course/classroom/enrollment/attendance/leave/lab/training/access_log）
-├── models/ ← ORM 模型（12 张表的 Python 类，对应 db/schema.sql）
+├── dao/ ← SQLAlchemy 数据访问（13 个：base/user/login_attempt/face/course/classroom/enrollment/attendance/leave/lab/training/access_log/task_signin_code）
+├── models/ ← ORM 模型（13 张表的 Python 类，对应 db/schema.sql；W13+ 加 task_signin_code）
 ├── db.py      ← SQLAlchemy engine + session_scope() 上下文
 ├── config.py  ← 读 .env，提供 Config 单例
 └── utils/     ← crypto（bcrypt）、face_helper（dlib 封装）
@@ -91,10 +91,10 @@ src/
 | 目录 | 是什么 |
 |---|---|
 | `src/` | **本项目代码**（4 层架构） |
-| `db/schema.sql` | MySQL DDL（12 张表，utf8mb4） |
+| `db/schema.sql` | MySQL DDL（13 张表，utf8mb4；W13+ 加 task_signin_code + signin_method 字段） |
 | `docs/` | 设计文档（PROJECT_PLAN / ARCHITECTURE / STRUCTURE / DEVELOPMENT / DATABASE / WORKFLOWS / TEAM_AND_TIMELINE） |
 | `docs/superpowers/plans/` | 实施计划（按 writing-plans skill 格式）。当前最新：`2026-06-08-W12-P0-fixes.md`（W12 P0 验收修复 + W13+ 课程交付计划，截止2026-06-20） |
-| `tests/` | 单元测试（**106/106** 全过，0 warning；含1 项 dtype 回归 +1 项 collect_for_user 死循环回归 + W12 新增24 项 camera/admin_tab 覆盖） |
+| `tests/` | 单元测试（**94+ 项业务 + 6 项 camera/face 全过**，0 warning；含 1 项 dtype 回归 + 1 项 collect_for_user 死循环回归 + W12 新增 24 项 camera/admin_tab 覆盖 + W13 新增 29 项 signin_code_dao/service/3 widgets） |
 | `scripts/` | 运维 + 烟测脚本（init_db / run_dev / seed_demo_data / cleanup_test_users / smoke_full_flow / smoke_real_face / smoke_ui_qtest / smoke_e2e） |
 | `dist/` `build/` | PyInstaller onedir打包产物（git ignore，不入库） |
 | `models/` | dlib 模型权重（git ignore，运行时下载） |
@@ -126,10 +126,16 @@ src/
 - ✅ **W10**：matplotlib内存 + dlib 下载超时
 - ✅ **W11**：int/float/env转换 +20领域系统扫
 - ✅ **W12**：P0验收修复12 真 bug +2业务功能（管理员人脸管理 + 学生清自己人脸）
-- ✅ 测试：**106/106** 全过，0 warning；含1 项 dtype回归 +1 项 collect_for_user死循环回归 + W12 新增24 项
-- ✅ Smoke：4 个脚本（full_flow / real_face / ui_qtest / e2e）全过
-- ✅ GitHub：47 commit 已推 main
-- 📋 下一步：W13+课程交付物（报告 PDF /答辩 PPT /演示视频 /提交物 .zip），详 `docs/superpowers/plans/2026-06-08-W12-P0-fixes.md`
+- ✅ **W13+**：教师/学生端「数字码 + 二维码」签到方式（对分易式手动触发码模式）
+  - 后端：task_signin_code 表 + TaskSigninCodeDao + AttendanceService 抽公共核 `_create_record` + 3 个签到方法 + 教师 generate_signin_code
+  - 教师端 UI：SigninCodeDialog 弹窗（4 位数字 / 250x250 QR / 60s 倒计时 / 刷新码按钮）
+  - 学生端 UI：Tab 2 改 QTabWidget（🤳 刷脸 / 🔢 数字码 / 📷 二维码）
+  - 测试：6 DAO + 21 service + 3 dialog + 2 digit + 2 qr_scan + smoke_signin_methods.py
+  - 详情 `docs/SIGNIN_METHODS.md`
+- ✅ 测试：全量 pytest 85 PASS + 18 SKIP（camera/face 业务无关用 --ignore 跳过）
+- ✅ Smoke：4 个旧 + 1 个新（smoke_signin_methods.py）
+- ✅ GitHub：48 commit 已推 main
+- 📋 下一步：W14+ 课程交付物（报告 PDF /答辩 PPT /演示视频 /提交物 .zip），详 `docs/superpowers/plans/2026-06-08-W12-P0-fixes.md`
 
 ## W3 Phase 5 学生端接入时必踩的坑
 
