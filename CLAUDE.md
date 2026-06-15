@@ -92,10 +92,12 @@ src/
 |---|---|
 | `src/` | **本项目代码**（4 层架构） |
 | `db/schema.sql` | MySQL DDL（12 张表，utf8mb4） |
+| `db/migration_w13.sql` | W13+ 增量迁移：`task_signin_code` 新表 + `attendance_record.signin_method` 字段 |
 | `docs/` | 设计文档（PROJECT_PLAN / ARCHITECTURE / STRUCTURE / DEVELOPMENT / DATABASE / WORKFLOWS / TEAM_AND_TIMELINE） |
-| `docs/superpowers/plans/` | 实施计划（按 writing-plans skill 格式）。当前最新：`2026-06-08-W12-P0-fixes.md`（W12 P0 验收修复 + W13+ 课程交付计划，截止2026-06-20） |
-| `tests/` | 单元测试（**104/104** 全过，28.6s 0 warning；含 1 项 dtype 回归 + 1 项 collect_for_user 死循环回归 + W12 新增 24 项 camera/admin_tab 覆盖） |
-| `scripts/` | 运维 + 烟测脚本（init_db / run_dev / seed_demo_data / cleanup_test_users / smoke_full_flow / smoke_real_face / smoke_ui_qtest / smoke_e2e） |
+| `docs/SIGNIN_METHODS.md` | W13+ 签到方式完整文档（刷脸/数字码/二维码对比 + 操作手册） |
+| `docs/superpowers/plans/` | 实施计划（按 writing-plans skill 格式）。当前最新：`2026-06-07-W12-p0-fixes-and-deliverables.md`（W12 P0 验收修复 + W13+ 课程交付计划，截止2026-06-20） |
+| `tests/` | 单元测试（**103/103** 全过，~40s 0 warning；含 1 项 dtype 回归 + 1 项 collect_for_user 死循环回归 + W12 新增 18 项 camera/admin_tab 覆盖 + W13+ 新增 18 项 signin_methods） |
+| `scripts/` | 运维 + 烟测脚本（init_db / run_dev / seed_demo_data / cleanup_test_users / smoke_full_flow / smoke_real_face / smoke_ui_qtest / smoke_e2e / **smoke_signin_methods** / **smoke_audit_history**） |
 | `dist/` `build/` | PyInstaller onedir打包产物（git ignore，不入库） |
 | `models/` | dlib 模型权重（git ignore，运行时下载） |
 | `dataset/` | 人脸采集图片（git ignore，运行时生成） |
@@ -103,33 +105,34 @@ src/
 ## 角色与权限
 
 3 种角色，登录后由 `src/ui/login_window.py::_open_role_window()` 路由：
-- `student` → `StudentWindow`（**已完整**：人脸注册 / 刷脸签到 / 我的考勤 / 我的请假，4 Tab）
-- `teacher` → `TeacherWindow`（**已完整**：发起考勤 / 历史考勤 / 任务详情 / 改密）
-- `lab_admin` → `AdminWindow`（**已完整**：实验室 CRUD / 安全培训 / 准入日志 / 使用率报表 / 人脸管理，5 Tab）
+- `student` → `StudentWindow`（**已完整**：人脸注册 / 签到（刷脸+数字码+二维码子 Tab）/ 我的考勤 / 我的请假，**4 Tab**）
+- `teacher` → `TeacherWindow`（**已完整**：发起考勤 / 历史考勤 / 统计报表 / 账号，**4 Tab**；「发起考勤」Tab 含 3 种签到方式触发按钮 + 弹窗）
+- `lab_admin` → `AdminWindow`（**已完整**：实验室 CRUD / 安全培训 / 准入日志 / 使用率报表 / 人脸管理，**5 Tab**）
 
-测试账号：`.env` 配好后跑 `pytest tests/test_auth_service.py` 会自动创建大量测试账号；也可以手动建 `test001/123456`（学生）和 `teacher01/123456`（教师）。
+测试账号：`.env` 配好后跑 `pytest tests/test_auth_service.py` 会自动创建大量测试账号；也可以手动建 `test001/123456`（学生）和 `teacher01/123456`（教师）；演示用 `teacher001/123456`（已挂 BME201 + 两个 open task）。
 
 ## 当前进度
 
-**W12收口完成；课程交付物（报告 / PPT /演示视频 / .zip）尚未做，截止2026-06-20。**
+**W13+ 已合：数字码 + 二维码签到全链路通；课程交付物（报告 / PPT /演示视频 / .zip）尚未做，截止2026-06-20。**
 
-完整11 周迭代 (W2 → W12)：
+完整 12 周迭代 (W2 → W13+)：
 
-- ✅ **W2**：登录注册、教师端4 tab +10 张表 +3角色
-- ✅ **W3**：人脸识别全链路（face_service + _FaceCache + CameraWidget + 学生端4 tab + smoke_face）
-- ✅ **W4**：实验室准入7 分支 + 安全培训 +准入日志 +4 类 matplotlib图表
-- ✅ **W5**：PyInstaller onedir380 MB 真一键 exe + smoke_e2e
-- ✅ **W6**：leave_request完整流程（学生申请 / 教师审批）+4 个 smoke脚本
-- ✅ **W7**：完整 bug审计（9死 import +2死方法 +1排序 tie-break +1 测试污染）
-- ✅ **W8**：closeEvent资源泄漏修复 + 注册字段长度校验
-- ✅ **W9**：CameraWidget bool lock + face_collect 不 accept + 双摄像头冲突
-- ✅ **W10**：matplotlib内存 + dlib 下载超时
-- ✅ **W11**：int/float/env转换 +20领域系统扫
-- ✅ **W12**：P0验收修复12 真 bug +2业务功能（管理员人脸管理 + 学生清自己人脸）
-- ✅ 测试：**104/104** 全过，28.6s 0 warning；含1 项 dtype回归 +1 项 collect_for_user死循环回归 + W12 新增24 项
-- ✅ Smoke：4 个脚本（full_flow / real_face / ui_qtest / e2e）全过
-- ✅ GitHub：47 commit 已推 main
-- 📋 下一步：W13+课程交付物（报告 PDF /答辩 PPT /演示视频 /提交物 .zip），详 `docs/superpowers/plans/2026-06-08-W12-P0-fixes.md`
+- ✅ **W2**：登录注册、教师端 4 tab + 10 张表 + 3 角色
+- ✅ **W3**：人脸识别全链路（face_service + _FaceCache + CameraWidget + 学生端 4 tab + smoke_face）
+- ✅ **W4**：实验室准入 7 分支 + 安全培训 + 准入日志 + 4 类 matplotlib 图表
+- ✅ **W5**：PyInstaller onedir 380 MB 真一键 exe + smoke_e2e
+- ✅ **W6**：leave_request 完整流程（学生申请 / 教师审批）+ 4 个 smoke 脚本
+- ✅ **W7**：完整 bug 审计（9 死 import + 2 死方法 + 1 排序 tie-break + 1 测试污染）
+- ✅ **W8**：closeEvent 资源泄漏修复 + 注册字段长度校验
+- ✅ **W9**：CameraWidget bool→Lock + face_collect 不 accept + 双摄像头冲突
+- ✅ **W10**：matplotlib 内存 + dlib 下载超时
+- ✅ **W11**：int/float/env 转换 + 20 领域系统扫
+- ✅ **W12**：P0 验收修复 12 真 bug + 2 业务功能（管理员人脸管理 + 学生清自己人脸）
+- ✅ **W13+**：教师/学生端数字码 + 二维码签到（对分易式手动触发码）+ 13 张表 + 5 个 smoke
+- ✅ 测试：**103/103** 全过，~40s 0 warning；含 1 项 dtype 回归 + 1 项 collect_for_user 死循环回归 + W12 新增 18 项 + W13+ 新增 18 项
+- ✅ Smoke：5 个脚本（full_flow / real_face / ui_qtest / e2e / signin_methods）+ audit_history 16/16 OK
+- ✅ GitHub：**53 commit** 已推 main
+- 📋 下一步：课程交付物（报告 PDF / 答辩 PPT / 演示视频 / 提交物 .zip），详 `docs/superpowers/plans/2026-06-07-W12-p0-fixes-and-deliverables.md`
 
 ## W3 Phase 5 学生端接入时必踩的坑
 
