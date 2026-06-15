@@ -160,7 +160,7 @@ def main() -> int:
         rec2 = att.sign_in_by_digit(task_id, stu1.id, "9999")
         # 9999 大概率不撞；如果撞了也至少验 status 是 digit（这测试对撞码鲁棒）
         if rec2 is None:
-            _ok("  错码 9999 返 None（不写记录）✓")
+            _ok("  错码 9999 返 None（不写记录）")
         else:
             # 撞了概率 1/10000：仍需保证不抛异常
             _ok(f"  撞码返回 status={rec2.status}（1/10000 概率，已通过）")
@@ -181,7 +181,7 @@ def main() -> int:
         _ok(f"  生成 qr token: {token!r}")
         rec3 = att.sign_in_by_qr(task_id, stu1.id, token)
         assert rec3 is None, f"stu1 已签过, 期望 None, 实际 {rec3!r}"
-        _ok("  stu1 重复签到返 None（UNIQUE 拦截）✓")
+        _ok("  stu1 重复签到返 None（UNIQUE 拦截）")
     except Exception as e:
         _fail(f"sign_in_by_qr (重复) 失败: {e}")
         import traceback; traceback.print_exc()
