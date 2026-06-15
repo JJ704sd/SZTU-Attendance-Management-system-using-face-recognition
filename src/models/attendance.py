@@ -37,6 +37,12 @@ class AttendanceRecord(Base):
     )
     match_score = Column(Float)
     face_image = Column(String(255))
+    # W13+: 区分刷脸 / 数字码 / 二维码签到，便于审计与按方式统计。
+    # 默认 'face' 兼容 W12 及更早记录（旧记录不留空即可）。
+    signin_method = Column(
+        Enum("face", "digit", "qr", name="signin_method"),
+        default="face",
+    )
     created_at = Column(DateTime, default=datetime.now)
 
 
