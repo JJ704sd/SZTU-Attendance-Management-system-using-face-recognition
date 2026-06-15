@@ -5,7 +5,7 @@ from typing import List, Optional
 from sqlalchemy import and_, desc
 
 from src.dao.base import BaseDao
-from src.models.attendance import AttendanceTask, AttendanceRecord, LeaveRequest
+from src.models.attendance import AttendanceTask, AttendanceRecord
 
 
 class AttendanceTaskDao(BaseDao[AttendanceTask]):
@@ -61,20 +61,3 @@ class AttendanceRecordDao(BaseDao[AttendanceRecord]):
         ).filter(AttendanceRecord.task_id == task_id).all()
         from collections import Counter
         return dict(Counter(r[0] for r in rows))
-
-
-class LeaveRequestDao(BaseDao[LeaveRequest]):
-    model = LeaveRequest
-
-    def find_pending(self) -> List[LeaveRequest]:
-        return self.s.query(LeaveRequest).filter(
-            LeaveRequest.status == "pending"
-        ).all()
-
-    def find_by_student_task(self, student_id: int, task_id: int) -> Optional[LeaveRequest]:
-        return self.s.query(LeaveRequest).filter(
-            and_(
-                LeaveRequest.student_id == student_id,
-                LeaveRequest.task_id == task_id,
-            )
-        ).first()
