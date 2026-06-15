@@ -94,6 +94,27 @@ class TeacherWindow(QWidget):
         layout.addWidget(self.open_task_label)
         self._refresh_open_task_label()
 
+        # W13+: 签到码工具栏（对分易式「教师手动触发」）
+        # 必须在有一个 open 任务时才能用，所以点按事件里再做"未选任务"提示
+        signin_toolbar = QHBoxLayout()
+        signin_toolbar.setSpacing(8)
+        self.btn_digit_code = QPushButton("🎲 数字签到")
+        self.btn_digit_code.setMinimumHeight(36)
+        self.btn_digit_code.setToolTip("生成 4 位数字签到码，学生在 end_time 前输入此码签到")
+        self.btn_digit_code.clicked.connect(lambda: self._on_open_signin_dialog("digit"))
+        self.btn_qr_code = QPushButton("📱 二维码签到")
+        self.btn_qr_code.setMinimumHeight(36)
+        self.btn_qr_code.setToolTip("生成二维码签到码，学生扫码即可完成签到")
+        self.btn_qr_code.clicked.connect(lambda: self._on_open_signin_dialog("qr"))
+        signin_toolbar.addWidget(self.btn_digit_code)
+        signin_toolbar.addWidget(self.btn_qr_code)
+        signin_toolbar.addStretch()
+        # 提示标签：告诉教师"对当前 open 任务生效"
+        signin_hint = QLabel("对当前 open 任务生效（手动触发，码过期需点 🔄 刷新）")
+        signin_hint.setStyleSheet("color: gray; font-size: 11px;")
+        signin_toolbar.addWidget(signin_hint)
+        layout.addLayout(signin_toolbar)
+
         layout.addStretch()
         page.setLayout(layout)
         return page
@@ -101,16 +122,27 @@ class TeacherWindow(QWidget):
     def _refresh_open_task_label(self):
         with session_scope() as s:
             dao = AttendanceTaskDao(s)
-            open_tasks = [t for t in dao.find_by_teacher(self.user.id) if t.status == "open"]
-        if not open_tasks:
+            self._open_tasks = [t for t in dao.find_by_teacher(self.user.id) if t.status == "open"]
+        if not self._open_tasks:
             self.open_task_label.setText("当前没有进行中的考勤任务")
             self.open_task_label.setStyleSheet("padding: 8px; background: #f0f8ff;")
         else:
-            t = open_tasks[0]
+            t = self._open_tasks[0]
             self.open_task_label.setText(
                 f"⏰ 任务 #{t.id} 进行中：{t.start_time:%Y-%m-%d %H:%M} ~ {t.end_time:%H:%M}"
             )
             self.open_task_label.setStyleSheet("padding: 8px; background: #fff8dc;")
+
+    def _get_open_task_id(self) -> int | None:
+        """返回当前教师第一个 open 任务的 id；没有则 None。
+
+        W13+: 被数字签到 / 二维码签到按钮复用，避免重复查 DB。
+        边界：若同时有多个 open 任务（极少见），只取最早创建的第一个；
+        想要指定任务可在历史 Tab 选中行（_selected_task_id）。
+        """
+        if not getattr(self, "_open_tasks", None):
+            return None
+        return self._open_tasks[0].id
 
     def _on_create_task(self):
         from src.ui.widgets.create_task_dialog import CreateTaskDialog
@@ -119,6 +151,33 @@ class TeacherWindow(QWidget):
             self._refresh_open_task_label()
             self._refresh_history()
             QMessageBox.information(self, "成功", "考勤任务已创建！")
+
+    def _on_open_signin_dialog(self, code_type: str):
+        """W13+: 教师点「数字签到 / 二维码签到」按钮 → 弹码显示弹窗。
+
+        任务来源优先级:
+          1) 当前 open 任务（_get_open_task_id）—— 教师最常用「边发边签」流程
+          2) 退回到历史 Tab 选中行（_selected_task_id）—— 演示 / 重签场景
+          3) 都没有 → 警告提示先创建/选中任务
+        """
+        task_id = self._get_open_task_id() or self._selected_task_id()
+        if task_id is None:
+            QMessageBox.warning(
+                self, "无法生成签到码",
+                "请先在「发起考勤」创建任务，或在「历史考勤」选中一个 open 任务",
+            )
+            return
+
+        from src.ui.widgets.signin_code_dialog import SigninCodeDialog
+        # 每次新建 widget —— 不缓存旧码（任务书边界要求）
+        # 把引用挂在 self 上，closeEvent 时能主动关掉（防悬挂引用导致 timer 未停）
+        self.signin_code_win = SigninCodeDialog(
+            parent=self,
+            task_id=task_id,
+            code_type=code_type,
+            teacher_window=self,
+        )
+        self.signin_code_win.exec_()
 
     # =====================================================
     # Tab 2: 历史考勤
@@ -304,6 +363,11 @@ class TeacherWindow(QWidget):
         """用户点 X 关窗时调用, 关闭可能打开的弹窗避免悬挂引用."""
         # 关闭可能打开的请假审批弹窗 (W6 Phase 1 加的)
         for attr in ("leave_review_win", "task_detail_win", "new_pwd_win"):
+            win = getattr(self, attr, None)
+            if win is not None and hasattr(win, "close"):
+                win.close()
+        # W13+: 关闭可能打开的签到码弹窗（数字码 / 二维码共用同一个 widget）
+        for attr in ("signin_code_win",):
             win = getattr(self, attr, None)
             if win is not None and hasattr(win, "close"):
                 win.close()

@@ -68,7 +68,7 @@ login_window ── register_window
 | service | 职责 | 阶段 |
 |---|---|---|
 | `auth_service` | 注册/登录/改密/防暴力锁定 (LOGIN_MAX_ATTEMPTS) | W2-W4 |
-| `attendance_service` | 考勤任务/签到/缺勤补齐/请假 | W2-W6 |
+| `attendance_service` | 考勤任务/签到（刷脸+数字码+二维码）/缺勤补齐/请假 | W2-W6 + W13+ |
 | `face_service` | 采集 (collect_for_user) / 识别 (recognize) / _FaceCache | W3 |
 | `lab_access_service` | 7 分支准入检查 (admin 自由/学生培训) | W4 |
 | `report_service` | 出勤率/趋势/实验室使用率/缺勤预警 4 方法 | W4 |
@@ -90,6 +90,7 @@ login_window ── register_window
 | `lab_dao` | Laboratory | find_by_id / find_all |
 | `lab_training_dao` | LabTraining | find_valid_by_student_lab / find_by_student |
 | `lab_access_log_dao` | LabAccessLog | log_attempt / find_by_lab (W7 加 id DESC tie-break) |
+| `task_signin_code_dao` | TaskSigninCode (W13+) | insert_new / find_active_by_value / deactivate_active_for_task_type |
 
 ## 5. utils (4 个)
 
