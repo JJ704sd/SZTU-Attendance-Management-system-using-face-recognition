@@ -24,14 +24,48 @@ hiddenimports = [
     # matplotlib PyQt5 backend
     'matplotlib.backends.backend_qt5agg',
     'matplotlib.backends.backend_qt5',
+    # W13+ 二维码签到 (PyInstaller 静态分析扫不到 qrcode.image.pil)
+    # W14 修复: 不加会导致 dist/_internal 缺 qrcode 目录，运行时 import qrcode 报 ModuleNotFoundError
+    'qrcode',
+    'qrcode.image.pil',
+    'qrcode.image.pure',
+    'qrcode.image.base',
+    'qrcode.compat.etree',
+    'qrcode.constants',
+    # W14: FastAPI 嵌入 (二维码签到 H5 服务)
+    # 类比 qrcode 那批: PyInstaller 静态分析扫不到 FastAPI/Starlette 的动态依赖,
+    # 必须显式列出, 否则 dist/_internal 缺包 → 打包后 exe 启动 import 失败。
+    'fastapi',
+    'fastapi.routing',
+    'fastapi.applications',
+    'fastapi.dependencies',
+    'fastapi.templating',
+    'fastapi.staticfiles',
+    'uvicorn',
+    'uvicorn.server',
+    'uvicorn.config',
+    'uvicorn.loops',
+    'uvicorn.protocols.http',
+    'uvicorn.protocols.http.auto',
+    'starlette',
+    'starlette.applications',
+    'starlette.routing',
+    'starlette.responses',
+    'jinja2',
+    'jinja2.ext',
+    'httpx',
+    'httpx._api',
+    'httpx._client',
     # 项目内 module 兜底（防 dynamic import 漏掉）
     'src.services.face_service',
     'src.services.lab_access_service',
     'src.services.report_service',
     'src.services.auth_service',
     'src.services.attendance_service',
+    'src.services.signin_web',          # W14: 多端登录签到
     'src.utils.face_helper',
     'src.utils.charts',
+    'src.utils.network',                # W14: LAN IP / 端口探测
     'src.utils.paths',
     'src.dao.face_dao',
     'src.dao.lab_dao',
@@ -39,7 +73,7 @@ hiddenimports = [
     'src.dao.lab_access_log_dao',
     'src.dao.course_enrollment_dao',
     'src.dao.login_attempt_dao',
-]
+] 
 
 # 2. datas = 额外要带进 exe 的资源
 # 暂时不打包：dlib 模型（运行时下载，.env（含密码），dataset/（用户运行时生成）

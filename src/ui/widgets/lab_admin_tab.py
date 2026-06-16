@@ -35,7 +35,8 @@ class LabEditDialog(QDialog):
         super().__init__(parent)
         self.lab = lab
         self.setWindowTitle("编辑实验室" if lab else "新增实验室")
-        self.resize(420, 280)
+        # W14+ 演示模式: 窗口 +60x60
+        self.resize(480, 340)
         self._init_ui()
         if lab:
             self._load_from(lab)

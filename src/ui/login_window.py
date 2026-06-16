@@ -27,15 +27,17 @@ class LoginWindow(QWidget):
 
     def _init_ui(self):
         self.setWindowTitle("智能考勤与实验室准入系统 — 登录")
-        self.resize(440, 480)
-        self.setMinimumWidth(400)
+        # W14+ 演示模式: 窗口 +60x80, 容纳更大表单字号
+        self.resize(520, 620)
+        self.setMinimumWidth(480)
 
         # —— 品牌头部 ——
         header = QWidget()
         header.setObjectName("AuthHeader")
+        # W14: header padding 加大 (顶/底各 +6px), 与 RADIUS_LG 协调
         header_layout = QVBoxLayout(header)
-        header_layout.setContentsMargins(20, 16, 20, 18)
-        header_layout.setSpacing(4)
+        header_layout.setContentsMargins(24, 22, 24, 24)
+        header_layout.setSpacing(6)
 
         top_row = QHBoxLayout()
         top_row.setSpacing(8)
@@ -56,9 +58,10 @@ class LoginWindow(QWidget):
         form_box = QGroupBox("账号登录")
         form = QFormLayout()
         form.setLabelAlignment(Qt.AlignRight | Qt.AlignVCenter)
-        form.setHorizontalSpacing(12)
-        form.setVerticalSpacing(12)
-        form.setContentsMargins(16, 22, 16, 14)
+        # W14: 现代化间距 —— SPACING_LG 横向, SPACING_LG+2 纵向, 让 3 个字段不挤
+        form.setHorizontalSpacing(16)
+        form.setVerticalSpacing(14)
+        form.setContentsMargins(20, 26, 20, 18)
 
         self.username_edit = QLineEdit()
         self.username_edit.setPlaceholderText("用户名 / 学号")
@@ -76,8 +79,9 @@ class LoginWindow(QWidget):
         form_box.setLayout(form)
 
         # —— 按钮 ——
+        # W14: 按钮间距加大到 SPACING_LG
         btn_layout = QHBoxLayout()
-        btn_layout.setSpacing(10)
+        btn_layout.setSpacing(12)
         self.login_btn = QPushButton("登 录")
         self.login_btn.setProperty("role", "primary")
         self.login_btn.setDefault(True)
@@ -92,9 +96,20 @@ class LoginWindow(QWidget):
         btn_layout.addWidget(self.quit_btn, stretch=1)
 
         # —— 状态栏 ——
+        # W14: 状态 banner 加 padding + 卡片底色, 提示更醒目;
+        # 颜色由 GLOBAL_QSS 的 QLabel[role="status"][state=*] 控制 (动态 property)
         self.status_label = QLabel("就绪 — 请使用账号登录")
         self.status_label.setObjectName("status")
         self.status_label.setProperty("role", "status")
+        # 卡片底色 + 圆角 + padding, 让 state=error / success / warning 视觉化更明显
+        self.status_label.setStyleSheet(
+            "QLabel#status {"
+            " background-color: #FFFFFF;"
+            " border: 1px solid #E5E7EB;"
+            " border-radius: 8px;"
+            " padding: 10px 14px;"
+            "}"
+        )
 
         # —— 主布局 ——
         outer = QVBoxLayout(self)
@@ -102,9 +117,10 @@ class LoginWindow(QWidget):
         outer.setSpacing(0)
         outer.addWidget(header)
 
+        # W14: body 内外边距/间距加大 (28/26/28/22, spacing 18)
         body = QVBoxLayout()
-        body.setContentsMargins(24, 22, 24, 18)
-        body.setSpacing(14)
+        body.setContentsMargins(28, 26, 28, 22)
+        body.setSpacing(18)
         body.addWidget(form_box)
         body.addLayout(btn_layout)
         body.addWidget(self.status_label)

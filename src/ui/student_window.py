@@ -51,6 +51,10 @@ from src.ui.widgets.qr_scan_widget import QrScanWidget
 
 log = logging.getLogger(__name__)
 
+# W14 现代化: 表格行高/表头高度 —— 与 styles.py 间距尺度保持一致
+TABLE_ROW_HEIGHT = 32       # 单元格高度 (px), 适合 14px 字号 + 8px 上下内边距
+TABLE_HEADER_HEIGHT = 38    # 表头高度 (px), GLOBAL_QSS 已有 10px 上下 padding
+
 # 状态 → (颜色, 文本)
 STATUS_DISPLAY = {
     "present": ("#16A34A", "✅ 出勤"),
@@ -86,17 +90,25 @@ class StudentWindow(QWidget):
         # 内部锁: _on_sub_signin_succeeded 调 _refresh_open_tasks 时置位, 防止
         # _on_task_changed 误把 banner / subtabs 灰显状态清掉.
         self._signed_in_lock: bool = False
+        # W14: 刷脸提示去重 —— 500ms tick 反复触发陌生人脸/他人脸时,
+        # 只在文案变化时刷新状态栏, 让 warning 视觉态保持可见
+        # (不清掉之前的提示, 让用户能稳定看到 "请对准摄像头本人" 之类).
+        self._last_face_status: Optional[str] = None
 
         self._init_ui()
 
     def _init_ui(self):
         self.setWindowTitle(f"学生端 — {self.user.real_name}")
-        self.resize(900, 640)
+        # W14+ 演示模式: 窗口 +240x140 容纳更大字号和摄像头
+        self.resize(1200, 820)
 
         # 顶部信息条（与教师端一致风格）
+        # W14: top spacing 加大, 让 welcome 标题与右侧 info 间距更舒展
         top = QHBoxLayout()
+        top.setSpacing(16)
         welcome = QLabel(f"欢迎，{self.user.real_name}{welcome_suffix(self.user)}")
-        wf = QFont(); wf.setPointSize(12); wf.setBold(True)
+        # W14+ 演示模式: Welcome 字号 12→15
+        wf = QFont(); wf.setPointSize(15); wf.setBold(True)
         welcome.setFont(wf)
         top.addWidget(welcome)
         top.addStretch()
@@ -129,7 +141,10 @@ class StudentWindow(QWidget):
         self.tabs.currentChanged.connect(self._on_tab_changed)
 
         # 主布局
+        # W14: 主布局 margin/spacing 加大
         main = QVBoxLayout()
+        main.setContentsMargins(12, 12, 12, 12)
+        main.setSpacing(10)
         main.addLayout(top)
         main.addWidget(self.tabs)
         self.setLayout(main)
@@ -151,11 +166,21 @@ class StudentWindow(QWidget):
 
         self.register_status = QLabel("加载中...")
         self.register_status.setProperty("role", "status")
+        # W14 现代化: 状态 banner 加 padding + 卡片底色 (与登录/注册一致)
+        self.register_status.setStyleSheet(
+            "QLabel {"
+            " background-color: #FFFFFF;"
+            " border: 1px solid #E5E7EB;"
+            " border-radius: 8px;"
+            " padding: 10px 14px;"
+            "}"
+        )
         layout.addWidget(self.register_status)
 
         # 摄像头预览
         self.register_camera = CameraWidget()
-        self.register_camera.setMinimumSize(480, 360)
+        # W14+ 演示模式: 摄像头最小尺寸 480x360 → 640x480, 人脸更清晰
+        self.register_camera.setMinimumSize(640, 480)
         self.register_camera.set_overlay_callback(self._draw_face_boxes)
         layout.addWidget(self.register_camera)
 
@@ -276,11 +301,17 @@ class StudentWindow(QWidget):
         三个子 Tab 互相独立, 通过监听 signin_succeeded 信号做「先到先签」灰显.
         """
         page = QWidget()
+        # W14: 签到 Tab 整体间距加大
         layout = QVBoxLayout()
+        layout.setSpacing(12)
+        layout.setContentsMargins(14, 14, 14, 14)
 
         # ===== 顶部: 任务下拉 + 「你已签到」提示 =====
+        # W14: top_row 间距加大, 让任务下拉区与 banner 不挤
         top_row = QVBoxLayout()
+        top_row.setSpacing(10)
         task_row = QHBoxLayout()
+        task_row.setSpacing(10)
         task_row.addWidget(QLabel("考勤任务:"))
         self.task_combo = QComboBox()
         self.task_combo.setMinimumWidth(300)
@@ -396,7 +427,8 @@ class StudentWindow(QWidget):
         layout = QVBoxLayout()
 
         # 摄像头 (已在 __init__ 创建 self.signin_camera, 这里直接 add 进来 + 配 overlay)
-        self.signin_camera.setMinimumSize(480, 360)
+        # W14+ 演示模式: 摄像头最小尺寸 480x360 → 640x480
+        self.signin_camera.setMinimumSize(640, 480)
         self.signin_camera.set_overlay_callback(self._draw_face_boxes)
         layout.addWidget(self.signin_camera)
 
@@ -404,6 +436,16 @@ class StudentWindow(QWidget):
         self.signin_status = QLabel("就绪 — 选择任务后点击「开始签到」")
         self.signin_status.setProperty("role", "status")
         self.signin_status.setWordWrap(True)
+        # W14 现代化: 状态 banner 加大 padding, warning 视觉态更明显
+        self.signin_status.setStyleSheet(
+            "QLabel {"
+            " background-color: #FFFFFF;"
+            " border: 1px solid #E5E7EB;"
+            " border-radius: 8px;"
+            " padding: 12px 16px;"
+            " font-size: 13px;"
+            "}"
+        )
         layout.addWidget(self.signin_status)
 
         # 按钮
@@ -507,6 +549,8 @@ class StudentWindow(QWidget):
         self._current_task_id = task_id
         self._signing_in = True
         self._signin_timer.start()
+        # W14: 重置刷脸提示去重状态, 新一轮签到开始时把上一轮的 warning 清掉
+        self._last_face_status = None
         self._set_label_state(self.signin_status,
                               f"签到中...请正对摄像头（任务 #{task_id}）", "neutral")
         self.start_signin_btn.setEnabled(False)
@@ -520,7 +564,17 @@ class StudentWindow(QWidget):
         self.stop_signin_btn.setEnabled(False)
 
     def _on_signin_tick(self):
-        """500ms 一次：抓帧 → face_encodings → recognize → 命中就签到。"""
+        """500ms 一次：抓帧 → face_encodings → recognize → 命中就签到。
+
+        W14 改造:
+        - 陌生人脸 (recognize 返回 None): 静默改为 warning 提示
+          "未识别到人脸，请对准摄像头本人"
+        - 识别到他人 (user_id != self.user.id): 中性提示改为 warning
+          "检测到其他用户，非本人签到无效。请本人面对摄像头",
+          不再泄露内部 user_id
+        - 用 self._last_face_status 去重: 同一文案不重复 setText/polish,
+          让 warning 状态稳定可见, 不被下一帧覆盖消失
+        """
         if not self._signing_in or not self.signin_camera.is_running():
             return
         frame = self.signin_camera.capture_one_frame()
@@ -546,14 +600,18 @@ class StudentWindow(QWidget):
             log.exception("recognize 异常")
             return
         if result is None:
+            # W14: 陌生人脸 → warning 提示用户调整位置/本人面对摄像头
+            self._update_face_status("未识别到人脸，请对准摄像头本人", "warning")
             return
         user_id, distance = result
         if user_id != self.user.id:
-            # 别人脸：继续识别，不签到
-            self._set_label_state(self.signin_status,
-                                  f"识别到他人（user_id={user_id}，距离={distance:.3f}），继续...", "neutral")
+            # W14: 识别到他人 → warning 提示, 不暴露内部 user_id
+            self._update_face_status(
+                "检测到其他用户，非本人签到无效。请本人面对摄像头", "warning")
             return
         # 是我 → 签到
+        # 重置去重状态, 让 _on_sub_signin_succeeded / _set_label_state(success) 正常生效
+        self._last_face_status = None
         self._on_stop_signin()
         try:
             record = self.attendance_service.sign_in_by_face(
@@ -572,6 +630,17 @@ class StudentWindow(QWidget):
                                 f"签到成功！\n状态: {record.status}\n距离: {distance:.4f}")
         # W13+: 走统一的「先到先签」灰显流程 (banner + disable subtabs + 刷新任务下拉)
         self._on_sub_signin_succeeded(record)
+
+    def _update_face_status(self, text: str, state: str):
+        """W14: 刷脸提示去重 —— 同一文案不重复调用 setProperty/polish,
+        让 warning 视觉态在 500ms tick 间稳定可见, 不被下一帧覆盖闪一下就消失.
+
+        调用方: _on_signin_tick 的陌生人脸 / 识别到他人分支.
+        """
+        if self._last_face_status == text:
+            return  # 文案没变, 不重复刷 QSS
+        self._last_face_status = text
+        self._set_label_state(self.signin_status, text, state)
 
     # ==================================================================
     # Tab 3: 我的考勤
@@ -594,6 +663,12 @@ class StudentWindow(QWidget):
         )
         self.attendance_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self.attendance_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        # W14 现代化: 斑马纹 + 行高/表头高度加大
+        self.attendance_table.setAlternatingRowColors(True)
+        self.attendance_table.verticalHeader().setDefaultSectionSize(TABLE_ROW_HEIGHT)
+        self.attendance_table.verticalHeader().setVisible(False)
+        self.attendance_table.horizontalHeader().setFixedHeight(TABLE_HEADER_HEIGHT)
+        self.attendance_table.setSelectionBehavior(QAbstractItemView.SelectRows)
         layout.addWidget(self.attendance_table)
 
         page.setLayout(layout)
@@ -656,6 +731,12 @@ class StudentWindow(QWidget):
         )
         self.leave_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self.leave_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        # W14 现代化: 斑马纹 + 行高/表头高度加大
+        self.leave_table.setAlternatingRowColors(True)
+        self.leave_table.verticalHeader().setDefaultSectionSize(TABLE_ROW_HEIGHT)
+        self.leave_table.verticalHeader().setVisible(False)
+        self.leave_table.horizontalHeader().setFixedHeight(TABLE_HEADER_HEIGHT)
+        self.leave_table.setSelectionBehavior(QAbstractItemView.SelectRows)
         layout.addWidget(self.leave_table)
 
         page.setLayout(layout)

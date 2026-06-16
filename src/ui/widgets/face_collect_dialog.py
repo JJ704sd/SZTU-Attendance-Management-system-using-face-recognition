@@ -123,7 +123,8 @@ class FaceCollectDialog(QDialog):
     def _init_ui(self, camera_widget: Optional["CameraWidget"] = None):
         self.setWindowTitle("人脸采集")
         self.setModal(True)
-        self.resize(640, 560)
+        # W14+ 演示模式: 窗口 +120x120, 容纳 640x480 大摄像头
+        self.resize(760, 680)
 
         layout = QVBoxLayout()
 
@@ -148,7 +149,8 @@ class FaceCollectDialog(QDialog):
             # 兜底: 没传 camera_widget 时, 兜底自己新建 (需要主窗 cam 已 stop)
             from src.ui.widgets.camera_widget import CameraWidget
             self._camera_widget = CameraWidget()
-            self._camera_widget.setMinimumSize(480, 360)
+            # W14+ 演示模式: 摄像头最小尺寸 480x360 → 640x480
+            self._camera_widget.setMinimumSize(640, 480)
             self._owns_camera = True  # 自己新建的, 关 dialog 时要 release
             cam_ok = self._camera_widget.start(0)
             if cam_ok:

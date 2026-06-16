@@ -19,7 +19,8 @@ class LeaveReviewDialog(QDialog):
         super().__init__(parent)
         self.approver = approver
         self.setWindowTitle("📝 待审批请假")
-        self.resize(820, 480)
+        # W14+ 演示模式: 窗口 +140x100
+        self.resize(960, 580)
         self._init_ui()
         self._load()
 

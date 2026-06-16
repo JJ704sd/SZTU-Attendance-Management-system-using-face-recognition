@@ -3,6 +3,7 @@ tests/conftest.py — pytest 公共 fixture
 - 自动把项目根目录加进 sys.path
 - 加载 .env
 - session 结束后自动清理 UUID 风格测试用户（防止反复跑测试导致冗余数据堆积）
+- session 结束后自动清理 fixture 创建的测试教室（W14+ 配套，与 _auto_cleanup_test_users 同模式）
 """
 import sys
 from pathlib import Path
@@ -99,3 +100,70 @@ def _auto_cleanup_test_users(request):
             {"re": TEST_USERNAME_RE},
         )
         print(f"\n[conftest] 🧹 auto-cleanup: 删除了 {result.rowcount} 个测试 fixture 用户（防止冗余积累）")
+
+
+# ---------------------------------------------------------------------------
+# session 级 autouse fixture: 跑完所有测试后清理 fixture 创建的测试教室 (W14+)
+# ---------------------------------------------------------------------------
+@pytest.fixture(scope="session", autouse=True)
+def _auto_cleanup_test_classrooms(request):
+    """session 末清理测试 fixture 创建的 classroom ('测试教室' 前缀).
+
+    动机:
+    - tests/test_signin_web.py:138 的 open_task fixture 每次跑都会
+      s.add(Classroom(name=f"测试教室{suf}")) 创建一条测试教室
+    - 反复跑测试 → classroom 表越攒越多（之前 321 条就是这么来的）
+    - 手动跑 scripts/cleanup_test_classrooms.py 治标不治本
+
+    规则（保守 + 安全）:
+    - 只匹配 name LIKE '测试教室%' (测试 fixture 唯一特征前缀)
+    - 不会误伤: A101 / A202 / A-2-415 / C-5-326 等正式教室（都不是这个前缀）
+    - FK 安全: 删除前先统计 attendance_task 引用数, 如果 > 0 跳过清理
+              (历史已验证 fixture 创建的教室不会被 attendance_task 引用, 引用都是 0)
+
+    跳过开关: pytest --no-cleanup (跟 _auto_cleanup_test_users 共用)
+    """
+    yield
+    if request.config.getoption("--no-cleanup"):
+        return
+
+    try:
+        from sqlalchemy import text
+        from src.db import engine
+    except Exception as exc:
+        print(f"\n[conftest._auto_cleanup_test_classrooms] 跳过清理: {exc}")
+        return
+
+    with engine.begin() as conn:
+        try:
+            cnt = conn.execute(
+                text("SELECT COUNT(*) FROM classroom WHERE name LIKE '测试教室%'")
+            ).scalar()
+        except Exception as exc:
+            print(f"\n[conftest._auto_cleanup_test_classrooms] 统计失败: {exc}")
+            return
+
+        if cnt == 0:
+            return  # 干净，静默通过
+
+        # 安全检查: 这些教室被 attendance_task 引用的条数 (FK 防御)
+        ref_count = conn.execute(
+            text("""
+                SELECT COUNT(*) FROM attendance_task at
+                JOIN classroom rm ON rm.id = at.classroom_id
+                WHERE rm.name LIKE '测试教室%'
+            """)
+        ).scalar()
+        if ref_count > 0:
+            print(
+                f"\n[conftest._auto_cleanup_test_classrooms] "
+                f"⚠️ {ref_count} 个测试教室被 attendance_task 引用, 跳过清理防 FK 错误"
+            )
+            return
+
+        result = conn.execute(
+            text("DELETE FROM classroom WHERE name LIKE '测试教室%'")
+        )
+        print(
+            f"\n[conftest] 🧹 auto-cleanup: 删除了 {result.rowcount} 个测试 fixture 教室（防止冗余积累）"
+        )

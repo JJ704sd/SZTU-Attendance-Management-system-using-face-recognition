@@ -21,6 +21,13 @@ python -m src.main
 # 等价启动方式
 bash scripts/run_dev.sh        # Linux/macOS
 scripts\run_dev.bat            # Windows
+
+# W14: 多端登录签到烟测
+python scripts/smoke_signin_web.py
+python scripts/smoke_signin_web_build.py
+
+# W15+ 一键清理 (多 GUI 进程抢资源时)
+kill_all_python.bat   # Windows
 ```
 
 ### 测试
@@ -73,6 +80,12 @@ src/
 | **SQLAlchemy 2.0 ORM** | 防 SQL 注入 + 跨数据库可移植（演示可一键切 SQLite） |
 | **PyQt5 而非 Tkinter** | 控件丰富，4 个主窗口有大量表格 + 表单 |
 | **face encoding 统一 float32** | `face_helper.face_encodings` 返回 `np.float32`，与 dlib 内部 + `FaceEncoding.encoding` 列注释一致；W3 序列化/比对链路不会再因量纲不一致出错。**不要改回 float64**，有 `test_face_encodings_dtype_is_float32` 锁住 |
+| **`src/ui/styles.py` 是跨层依赖** | `src/utils/charts.py` 用 `from src.ui.styles import (COLOR_BG, COLOR_BUTTON, COLOR_DANGER, COLOR_PRIMARY, COLOR_SUCCESS, COLOR_WARNING, FONT_FAMILY)` 同步 matplotlib 主题色。重写 styles.py 时**只改 COLOR_* 值不删名**；入口函数签名 `apply_global_style / apply_auth_style / welcome_suffix` 也保持不变。W14 引入 design tokens (`RADIUS_*` / `SHADOW_*` / `FONT_SIZE_*` / `SPACING_*`) 时同样**只增常量不删旧的** |
+| **FastAPI 嵌入到 PyQt 进程（不独立跑）** | W14 多端登录签到需要 HTTP 服务，但项目本身是桌面应用；独立跑 uvicorn 进程需要管端口/启停/与 GUI 生命周期对齐，体验割裂。改为 `uvicorn.Server` 在 `threading.Thread(daemon=True)` 里跑，`closeEvent` 调 `srv.should_exit = True` 同步停。SigninCodeDialog show → start，close → stop，单进程统一 |
+| **W14 二维码签到内容 = URL（不是裸 token）** | 教师电脑起 :5180 FastAPI + H5 签到页，学生手机扫码后浏览器打开 `http://<lan_ip>:5180/signin/<task>/<token>`；二维码内容是完整 URL（带 host+port+path+token），手机浏览器直接渲染表单。`src/utils/network.get_lan_ip()` 自动探本机局域网 IP；端口冲突自动 +1 重试 1 次（`src/services/signin_web.py::SigninWebServer.start`） |
+| **W15+ H5 入口路由不校验 token（只校验 task_id）** | `signin_web.py::signin_page` 之前有 `tok != token` 闭包校验，web_server 内存 token 是启时定死的，跟 DB LIVE token 永远不一致（dialog 启动时 `_generate_code` 又 generate 一次会 deactive 闭包里的）。H5 真实 token 校验交给 `dao.find_active_by_value(*, is_active=1, expires_at>now)` 实时查 DB（W15+ 修法 A）。**W15+ 教训：in-memory state（闭包/缓存）不能当真理** |
+| **W15+ H5 polling 防缓存** | 新增 `GET /api/signin/latest?task={id}` 返当前 LIVE token + expires_at + seconds_to_expire；H5 进入后每 3 秒 polling 一次，提交用 polling 拿到的最新 token（不是 URL 里的老 token），即使教师中途刷码老 H5 URL 也不会失效 |
+| **W15+ dialog 启动时必须调 `web_server.update_token`** | `SigninCodeDialog.__init__` 末尾会再调 `_generate_code()` 覆盖 teacher_window 启 web_server 时的 token（DB 自动 deactivate 老 token）；**修法**：`_generate_code` 后必须 `web_server.update_token(self._code_value)` 同步 web_server.url，否则二维码内容是错的 token URL |
 
 ## 环境陷阱（容易踩的）
 
@@ -85,6 +98,8 @@ src/
   git -c http.proxy= -c https.proxy= push -u origin main
   ```
 - **课程要求 PDF** `2025-2026-2+数据库原理+课程设计要求.pdf` 仍在项目根目录的磁盘上（是学校发的参考资料），但**已从 git 撤库**（commit `f956163`），`.gitignore` 里 `*.pdf` 规则会拦住
+- **W15+ 多 GUI 进程抢资源**——`start.bat` 启的 `.venv` GUI 没关 + 又用 PowerShell/system Python 启一个 → 两个 python 进程都跑，5180 端口冲突 + SQLAlchemy 连接池独立。**修法**：跑 `kill_all_python.bat`（全 ASCII）一次清干净 + 双击 `start.bat` 重启。**永远 "kill all + start one"**
+- **W15+ `.bat` 必须全 ASCII**——cmd 5.1 默认 GBK 编码，UTF-8 写的中文注释里的英文 token（如 `cmd.exe` / `python.exe`）被 cmd 当命令执行 → "不是内部或外部命令"。**修法**：`.bat` 删所有中文注释，全 ASCII；顶部加 `chcp 65001 >nul` 防输出乱码；echo 内容避免 `()` 圆括号（cmd 5.1 解析成 nested block）
 
 ## 仓库拓扑
 
@@ -93,11 +108,12 @@ src/
 | `src/` | **本项目代码**（4 层架构） |
 | `db/schema.sql` | MySQL DDL（12 张表，utf8mb4） |
 | `db/migration_w13.sql` | W13+ 增量迁移：`task_signin_code` 新表 + `attendance_record.signin_method` 字段 |
+| `db/migration_w14.sql` | W14+ 增量迁移：`course_teacher` 多对多表（Q3=B schema 变更） |
 | `docs/` | 设计文档（PROJECT_PLAN / ARCHITECTURE / STRUCTURE / DEVELOPMENT / DATABASE / WORKFLOWS / TEAM_AND_TIMELINE） |
 | `docs/SIGNIN_METHODS.md` | W13+ 签到方式完整文档（刷脸/数字码/二维码对比 + 操作手册） |
 | `docs/superpowers/plans/` | 实施计划（按 writing-plans skill 格式）。当前最新：`2026-06-07-W12-p0-fixes-and-deliverables.md`（W12 P0 验收修复 + W13+ 课程交付计划，截止2026-06-20） |
-| `tests/` | 单元测试（**103/103** 全过，~40s 0 warning；含 1 项 dtype 回归 + 1 项 collect_for_user 死循环回归 + W12 新增 18 项 camera/admin_tab 覆盖 + W13+ 新增 18 项 signin_methods） |
-| `scripts/` | 运维 + 烟测脚本（init_db / run_dev / seed_demo_data / cleanup_test_users / smoke_full_flow / smoke_real_face / smoke_ui_qtest / smoke_e2e / **smoke_signin_methods** / **smoke_audit_history**） |
+| `tests/` | 单元测试（**188/188** 全过，~72s 7 warning；含 1 项 dtype 回归 + 1 项 collect_for_user 死循环回归 + W12 新增 18 项 camera/admin_tab 覆盖 + W13+ 新增 18 项 signin_methods + W14 新增 11 项 signin_web + 10 项 UI 现代化 + 5 项 task_signin_code_dao + **W15+ 新增 3 项 latest API 测试**） |
+| `scripts/` | 运维 + 烟测脚本（init_db / run_dev / seed_demo_data / cleanup_test_users / smoke_full_flow / smoke_real_face / smoke_ui_qtest / smoke_e2e / **smoke_signin_methods** / **smoke_audit_history** / **smoke_qrcode_build** / **smoke_signin_web** / **smoke_signin_web_build** / **import_schedule** / **cleanup_test_classrooms**） |
 | `dist/` `build/` | PyInstaller onedir打包产物（git ignore，不入库） |
 | `models/` | dlib 模型权重（git ignore，运行时下载） |
 | `dataset/` | 人脸采集图片（git ignore，运行时生成） |
@@ -113,9 +129,9 @@ src/
 
 ## 当前进度
 
-**W13+ 已合：数字码 + 二维码签到全链路通；课程交付物（报告 / PPT /演示视频 / .zip）尚未做，截止2026-06-20。**
+**W15+ 已合：UI 现代化（5 主窗体 + 12 widget margin/spacing 加大 + design tokens）+ W14 收尾（course_teacher 多对多表 + 课表导入）+ signin_web 入口路由 token 校验 bug 修复 + H5 polling 防缓存 + 多 GUI 进程清理工具（kill_all_python.bat）**
 
-完整 12 周迭代 (W2 → W13+)：
+完整 14 周迭代 (W2 → W15+)：
 
 - ✅ **W2**：登录注册、教师端 4 tab + 10 张表 + 3 角色
 - ✅ **W3**：人脸识别全链路（face_service + _FaceCache + CameraWidget + 学生端 4 tab + smoke_face）
@@ -129,10 +145,12 @@ src/
 - ✅ **W11**：int/float/env 转换 + 20 领域系统扫
 - ✅ **W12**：P0 验收修复 12 真 bug + 2 业务功能（管理员人脸管理 + 学生清自己人脸）
 - ✅ **W13+**：教师/学生端数字码 + 二维码签到（对分易式手动触发码）+ 13 张表 + 5 个 smoke
-- ✅ 测试：**103/103** 全过，~40s 0 warning；含 1 项 dtype 回归 + 1 项 collect_for_user 死循环回归 + W12 新增 18 项 + W13+ 新增 18 项
-- ✅ Smoke：5 个脚本（full_flow / real_face / ui_qtest / e2e / signin_methods）+ audit_history 16/16 OK
-- ✅ GitHub：**53 commit** 已推 main
-- 📋 下一步：课程交付物（报告 PDF / 答辩 PPT / 演示视频 / 提交物 .zip），详 `docs/superpowers/plans/2026-06-07-W12-p0-fixes-and-deliverables.md`
+- ✅ **W14**：FastAPI 嵌入 + H5 签到页 + 多端登录（手机扫码 → 浏览器 → 教师端实时反馈）+ UI 现代化（17 文件）
+- ✅ **W15+**：signin_web 入口路由修复（删 `tok != token` 闭包校验）+ H5 polling 防缓存（`/api/signin/latest`）+ dialog 启动时 `update_token` 同步 + 多 GUI 进程清理工具
+- ✅ 测试：**188/188** 全过（含 W15+ 新增 3 项 latest API 测试：当前 LIVE token / 刷新后返新 token / 404 NO_LIVE_TOKEN）
+- ✅ Smoke：smoke_signin_web (9 步全链路) + smoke_signin_web_build + audit_history 16/16 + smoke_qrcode_build
+- ✅ GitHub：**57 commit** 已推 feature/ui-modernize（commit `af563bb`）
+- 📋 下一步：课程交付物（报告 PDF / 答辩 PPT / 演示视频 / 提交物 .zip），详 `docs/superpowers/plans/2026-06-07-W12-p0-fixes-and-deliverables.md` + `docs/W14-defense-outline.md`
 
 ## W3 Phase 5 学生端接入时必踩的坑
 

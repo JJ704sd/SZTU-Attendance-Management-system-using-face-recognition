@@ -26,23 +26,33 @@ from src.ui.styles import welcome_suffix
 
 log = logging.getLogger(__name__)
 
+# W14 现代化: 表格行高/表头高度 —— 与 student_window / admin_window 保持一致
+TABLE_ROW_HEIGHT = 32
+TABLE_HEADER_HEIGHT = 38
+
 
 class TeacherWindow(QWidget):
     def __init__(self, user: User):
         super().__init__()
         self.user = user  # 已登录的教师 User
         self.attendance = AttendanceService()
+        # W15+: 当前签到码弹窗引用 (用于"重复点二维码签到"时复用 stop 老 web_server)
+        self.signin_code_win = None
         self._init_ui()
 
     def _init_ui(self):
         self.setWindowTitle(f"教师端 — {self.user.real_name}")
-        self.resize(900, 600)
+        # W14+ 演示模式: 窗口 +240x160 容纳更大字号和摄像头, 1080P 投影不挤
+        self.resize(1200, 800)
 
         # 顶部
+        # W14: top spacing 加大
         top = QHBoxLayout()
+        top.setSpacing(16)
         welcome = QLabel(f"欢迎，{self.user.real_name}{welcome_suffix(self.user)}")
         welcome_font = QFont()
-        welcome_font.setPointSize(12)
+        # W14+ 演示模式: Welcome 字号 12→15, 投影清晰
+        welcome_font.setPointSize(15)
         welcome_font.setBold(True)
         welcome.setFont(welcome_font)
         top.addWidget(welcome)
@@ -62,7 +72,10 @@ class TeacherWindow(QWidget):
         self.tabs.addTab(self._build_account_tab(), "账号")
 
         # 主布局
+        # W14: 主布局 margin/spacing 加大
         main = QVBoxLayout()
+        main.setContentsMargins(12, 12, 12, 12)
+        main.setSpacing(10)
         main.addLayout(top)
         main.addWidget(self.tabs)
         self.setLayout(main)
@@ -75,7 +88,10 @@ class TeacherWindow(QWidget):
     # =====================================================
     def _build_create_tab(self) -> QWidget:
         page = QWidget()
+        # W14: 签到 Tab 整体 margin/spacing 加大
         layout = QVBoxLayout()
+        layout.setContentsMargins(14, 14, 14, 14)
+        layout.setSpacing(12)
         layout.setAlignment(Qt.AlignTop)
 
         intro = QLabel("点击下方按钮创建一个新的考勤任务。\n任务创建后保持 open 状态，"
@@ -89,8 +105,11 @@ class TeacherWindow(QWidget):
         layout.addWidget(self.create_btn)
 
         # 当前 open 的任务提示
+        # W14: 加 padding 加大 + 圆角, 与现代化卡片化对齐
         self.open_task_label = QLabel("当前没有进行中的考勤任务")
-        self.open_task_label.setStyleSheet("padding: 8px; background: #f0f8ff;")
+        self.open_task_label.setStyleSheet(
+            "QLabel { padding: 12px 16px; border-radius: 8px; }"
+        )
         layout.addWidget(self.open_task_label)
         self._refresh_open_task_label()
 
@@ -125,13 +144,21 @@ class TeacherWindow(QWidget):
             self._open_tasks = [t for t in dao.find_by_teacher(self.user.id) if t.status == "open"]
         if not self._open_tasks:
             self.open_task_label.setText("当前没有进行中的考勤任务")
-            self.open_task_label.setStyleSheet("padding: 8px; background: #f0f8ff;")
+            # W14: 中性卡片底色 (白 + 灰边 + 蓝文字)
+            self.open_task_label.setStyleSheet(
+                "QLabel { padding: 12px 16px; border-radius: 8px;"
+                " background-color: #F8FAFC; color: #475569; border: 1px solid #E5E7EB; }"
+            )
         else:
             t = self._open_tasks[0]
             self.open_task_label.setText(
                 f"⏰ 任务 #{t.id} 进行中：{t.start_time:%Y-%m-%d %H:%M} ~ {t.end_time:%H:%M}"
             )
-            self.open_task_label.setStyleSheet("padding: 8px; background: #fff8dc;")
+            # W14: 进行中卡片底色 (淡琥珀 + 琥珀边 + 琥珀字)
+            self.open_task_label.setStyleSheet(
+                "QLabel { padding: 12px 16px; border-radius: 8px;"
+                " background-color: #FFFBEB; color: #92400E; border: 1px solid #FDE68A; }"
+            )
 
     def _get_open_task_id(self) -> int | None:
         """返回当前教师第一个 open 任务的 id；没有则 None。
@@ -159,6 +186,12 @@ class TeacherWindow(QWidget):
           1) 当前 open 任务（_get_open_task_id）—— 教师最常用「边发边签」流程
           2) 退回到历史 Tab 选中行（_selected_task_id）—— 演示 / 重签场景
           3) 都没有 → 警告提示先创建/选中任务
+
+        W14 增强（仅 code_type='qr'）:
+          - 提前调 attendance.generate_signin_code 拿 token
+          - 实例化并启动 SigninWebServer（FastAPI 嵌入）
+          - 传 web_server 给 SigninCodeDialog，让 dialog 拿 url 做二维码内容
+          - 若 web_server.start() 异常 → 弹 QMessageBox + 不创建 dialog（避免半启动状态）
         """
         task_id = self._get_open_task_id() or self._selected_task_id()
         if task_id is None:
@@ -169,6 +202,66 @@ class TeacherWindow(QWidget):
             return
 
         from src.ui.widgets.signin_code_dialog import SigninCodeDialog
+
+        # W15+: 复用现有 dialog + web_server, 避免端口残留
+        if self.signin_code_win is not None:
+            try:
+                old_win = self.signin_code_win
+                old_web = getattr(old_win, "web_server", None)
+                if old_web is not None:
+                    try:
+                        old_web.stop()
+                        log.info("复用检查: stop 老的 SigninWebServer (port=%s)", old_web.port)
+                    except Exception as e:
+                        log.debug("stop 老 web_server 异常 (忽略): %s", e)
+                old_win.close()
+                old_win.deleteLater()
+            except Exception as e:
+                log.debug("关老 dialog 异常 (忽略): %s", e)
+            finally:
+                self.signin_code_win = None
+
+        # W14: 仅 qr 类型启 web_server，digit 保持原行为（不启服务）
+        web_server = None
+        if code_type == "qr":
+            try:
+                # 1) 提前生成 token（dialog 内不再生成，避免重复 deactivate）
+                result = self.attendance.generate_signin_code(task_id, "qr")
+                if result is None:
+                    QMessageBox.warning(
+                        self, "生成失败",
+                        "请确认任务状态为 open",
+                    )
+                    return
+                token = result["code"]
+                expires_at = result["expires_at"]
+
+                # 2) 实例化 + 启动本地 HTTP 服务（端口冲突自动 +1）
+                from src.services.signin_web import SigninWebServer
+                web_server = SigninWebServer(
+                    task_id=task_id,
+                    token=token,
+                    expires_at=expires_at,
+                )
+                web_server.start()
+                log.info(
+                    "W14 SigninWebServer 已启动: %s (task=%s)",
+                    web_server.url, task_id,
+                )
+            except Exception as e:
+                log.exception("启 SigninWebServer 失败: %s", e)
+                QMessageBox.critical(
+                    self, "启动本地签到服务失败",
+                    f"无法启动二维码签到服务：\n{e}\n\n请检查端口占用或稍后重试。",
+                )
+                # 半启动状态清理: web_server 可能已部分启动
+                if web_server is not None:
+                    try:
+                        web_server.stop()
+                    except Exception:
+                        pass
+                return
+
         # 每次新建 widget —— 不缓存旧码（任务书边界要求）
         # 把引用挂在 self 上，closeEvent 时能主动关掉（防悬挂引用导致 timer 未停）
         self.signin_code_win = SigninCodeDialog(
@@ -176,6 +269,7 @@ class TeacherWindow(QWidget):
             task_id=task_id,
             code_type=code_type,
             teacher_window=self,
+            web_server=web_server,
         )
         self.signin_code_win.exec_()
 
@@ -184,9 +278,14 @@ class TeacherWindow(QWidget):
     # =====================================================
     def _build_history_tab(self) -> QWidget:
         page = QWidget()
+        # W14: 历史 Tab 整体 margin/spacing 加大
         layout = QVBoxLayout()
+        layout.setContentsMargins(14, 14, 14, 14)
+        layout.setSpacing(12)
 
+        # W14: toolbar 间距加大
         toolbar = QHBoxLayout()
+        toolbar.setSpacing(10)
         self.refresh_btn = QPushButton("刷新")
         self.refresh_btn.clicked.connect(self._refresh_history)
         self.view_detail_btn = QPushButton("查看签到详情")
@@ -211,6 +310,11 @@ class TeacherWindow(QWidget):
         self.history_table.setSelectionBehavior(QAbstractItemView.SelectRows)
         self.history_table.setSelectionMode(QAbstractItemView.SingleSelection)
         self.history_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        # W14 现代化: 斑马纹 + 行高/表头高度加大
+        self.history_table.setAlternatingRowColors(True)
+        self.history_table.verticalHeader().setDefaultSectionSize(TABLE_ROW_HEIGHT)
+        self.history_table.verticalHeader().setVisible(False)
+        self.history_table.horizontalHeader().setFixedHeight(TABLE_HEADER_HEIGHT)
         layout.addWidget(self.history_table)
 
         page.setLayout(layout)

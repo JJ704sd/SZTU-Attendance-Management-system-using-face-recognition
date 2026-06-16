@@ -37,11 +37,15 @@ class AdminWindow(QWidget):
 
     def _init_ui(self):
         self.setWindowTitle(f"实验室管理员端 — {self.user.real_name}")
-        self.resize(1100, 700)  # 加宽以容纳 matplotlib 图表
+        # W14+ 演示模式: 窗口 +140x120 容纳 matplotlib 大字号坐标 + 表格更舒展
+        self.resize(1280, 860)
 
+        # W14: 顶部信息条 spacing 加大, 与 teacher/student 风格一致
         top = QHBoxLayout()
+        top.setSpacing(16)
         welcome = QLabel(f"欢迎，{self.user.real_name}{welcome_suffix(self.user)}")
-        f = QFont(); f.setPointSize(12); f.setBold(True)
+        # W14+ 演示模式: Welcome 字号 12→15
+        f = QFont(); f.setPointSize(15); f.setBold(True)
         welcome.setFont(f)
         top.addWidget(welcome)
         top.addStretch()
@@ -51,6 +55,8 @@ class AdminWindow(QWidget):
         top.addWidget(self.logout_btn)
 
         self.tabs = QTabWidget()
+        # W14 现代化: Tab 控件 document 模式, 配合 GLOBAL_QSS 的 QTabBar::tab 现代化样式
+        self.tabs.setDocumentMode(True)
         # Tab 1 实验室管理（Phase 5a 完成）
         from src.ui.widgets.lab_admin_tab import LabAdminTab
         self.tab_lab = LabAdminTab()
@@ -76,7 +82,10 @@ class AdminWindow(QWidget):
         self.tab_face = FaceAdminTab()
         self.tabs.addTab(self.tab_face, "👤 人脸管理")
 
+        # W14: 主布局 margin/spacing 加大, 让顶部信息条与 Tab 容器不挤
         main = QVBoxLayout()
+        main.setContentsMargins(12, 12, 12, 12)
+        main.setSpacing(10)
         main.addLayout(top)
         main.addWidget(self.tabs)
         self.setLayout(main)

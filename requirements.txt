@@ -1,6 +1,17 @@
 # =====================================================
 # 智能考勤与实验室准入系统 — 主依赖
-# Python 3.11+ （已在 3.13.9 验证）
+# =====================================================
+# ⚠️  Python 版本要求: 3.13.x（已在 3.13.6 / 3.13.9 验证）
+#
+# 为什么不是 3.11 / 3.12?
+#   - 3.11 / 3.12 上 numpy 2.x + matplotlib 3.10 + PyQt5 5.15 组合
+#     本项目未验证,可能装上但运行时炸
+#   - 3.13 是课程验收机(Windows 11) + dlib-bin 20.0.1 预编译 wheel 全覆盖的版本
+#
+# 装错版本会怎样?
+#   - 3.13 之外的版本 pip install dlib-bin 失败,要 cmake + VS Build Tools 编译(30+ 分钟)
+#
+# 详细 onboarding 看 QUICKSTART.md 顶部"5 分钟跑起来"
 # =====================================================
 
 # --- UI ---
@@ -26,3 +37,17 @@ matplotlib==3.10.9  # 3.9+ 起支持 numpy 2.x；3.8.x 仍要求 numpy<2 会和 
 
 # --- 测试 ---
 pytest>=8.0
+
+# --- W14: 多端登录签到 (FastAPI 嵌入) ---
+# fastapi 负责 H5 路由 + JSON 响应；uvicorn 是 ASGI server；
+# jinja2 渲染 signin.html；httpx 是测试端 client (替代 requests 走同步 API)。
+fastapi==0.115.0
+uvicorn[standard]==0.32.0
+jinja2==3.1.4
+httpx==0.27.2
+
+# --- W13+: 二维码签到 (教师端生成二维码图片, 学生扫码进 H5) ---
+# qrcode 8.x 是 pre-Python 3.13 wheel 全的最后一个分支; [pil] extra 拉 Pillow 作为后端
+# (build.spec hiddenimports 已经显式列 qrcode / qrcode.image.pil / qrcode.image.pure
+#  / qrcode.image.base / qrcode.compat.etree / qrcode.constants, 这里必须装否则开发环境 import 失败)
+qrcode[pil]==8.2
