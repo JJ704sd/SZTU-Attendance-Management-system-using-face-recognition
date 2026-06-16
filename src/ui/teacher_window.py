@@ -183,6 +183,12 @@ class TeacherWindow(QWidget):
           1) 当前 open 任务（_get_open_task_id）—— 教师最常用「边发边签」流程
           2) 退回到历史 Tab 选中行（_selected_task_id）—— 演示 / 重签场景
           3) 都没有 → 警告提示先创建/选中任务
+
+        W14 增强（仅 code_type='qr'）:
+          - 提前调 attendance.generate_signin_code 拿 token
+          - 实例化并启动 SigninWebServer（FastAPI 嵌入）
+          - 传 web_server 给 SigninCodeDialog，让 dialog 拿 url 做二维码内容
+          - 若 web_server.start() 异常 → 弹 QMessageBox + 不创建 dialog（避免半启动状态）
         """
         task_id = self._get_open_task_id() or self._selected_task_id()
         if task_id is None:
@@ -193,6 +199,48 @@ class TeacherWindow(QWidget):
             return
 
         from src.ui.widgets.signin_code_dialog import SigninCodeDialog
+
+        # W14: 仅 qr 类型启 web_server，digit 保持原行为（不启服务）
+        web_server = None
+        if code_type == "qr":
+            try:
+                # 1) 提前生成 token（dialog 内不再生成，避免重复 deactivate）
+                result = self.attendance.generate_signin_code(task_id, "qr")
+                if result is None:
+                    QMessageBox.warning(
+                        self, "生成失败",
+                        "请确认任务状态为 open",
+                    )
+                    return
+                token = result["code"]
+                expires_at = result["expires_at"]
+
+                # 2) 实例化 + 启动本地 HTTP 服务（端口冲突自动 +1）
+                from src.services.signin_web import SigninWebServer
+                web_server = SigninWebServer(
+                    task_id=task_id,
+                    token=token,
+                    expires_at=expires_at,
+                )
+                web_server.start()
+                log.info(
+                    "W14 SigninWebServer 已启动: %s (task=%s)",
+                    web_server.url, task_id,
+                )
+            except Exception as e:
+                log.exception("启 SigninWebServer 失败: %s", e)
+                QMessageBox.critical(
+                    self, "启动本地签到服务失败",
+                    f"无法启动二维码签到服务：\n{e}\n\n请检查端口占用或稍后重试。",
+                )
+                # 半启动状态清理: web_server 可能已部分启动
+                if web_server is not None:
+                    try:
+                        web_server.stop()
+                    except Exception:
+                        pass
+                return
+
         # 每次新建 widget —— 不缓存旧码（任务书边界要求）
         # 把引用挂在 self 上，closeEvent 时能主动关掉（防悬挂引用导致 timer 未停）
         self.signin_code_win = SigninCodeDialog(
@@ -200,6 +248,7 @@ class TeacherWindow(QWidget):
             task_id=task_id,
             code_type=code_type,
             teacher_window=self,
+            web_server=web_server,
         )
         self.signin_code_win.exec_()
 
