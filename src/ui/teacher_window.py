@@ -26,6 +26,10 @@ from src.ui.styles import welcome_suffix
 
 log = logging.getLogger(__name__)
 
+# W14 现代化: 表格行高/表头高度 —— 与 student_window / admin_window 保持一致
+TABLE_ROW_HEIGHT = 32
+TABLE_HEADER_HEIGHT = 38
+
 
 class TeacherWindow(QWidget):
     def __init__(self, user: User):
@@ -36,10 +40,13 @@ class TeacherWindow(QWidget):
 
     def _init_ui(self):
         self.setWindowTitle(f"教师端 — {self.user.real_name}")
-        self.resize(900, 600)
+        # W14 现代化: 窗口高度 +40
+        self.resize(960, 640)
 
         # 顶部
+        # W14: top spacing 加大
         top = QHBoxLayout()
+        top.setSpacing(16)
         welcome = QLabel(f"欢迎，{self.user.real_name}{welcome_suffix(self.user)}")
         welcome_font = QFont()
         welcome_font.setPointSize(12)
@@ -62,7 +69,10 @@ class TeacherWindow(QWidget):
         self.tabs.addTab(self._build_account_tab(), "账号")
 
         # 主布局
+        # W14: 主布局 margin/spacing 加大
         main = QVBoxLayout()
+        main.setContentsMargins(12, 12, 12, 12)
+        main.setSpacing(10)
         main.addLayout(top)
         main.addWidget(self.tabs)
         self.setLayout(main)
@@ -75,7 +85,10 @@ class TeacherWindow(QWidget):
     # =====================================================
     def _build_create_tab(self) -> QWidget:
         page = QWidget()
+        # W14: 签到 Tab 整体 margin/spacing 加大
         layout = QVBoxLayout()
+        layout.setContentsMargins(14, 14, 14, 14)
+        layout.setSpacing(12)
         layout.setAlignment(Qt.AlignTop)
 
         intro = QLabel("点击下方按钮创建一个新的考勤任务。\n任务创建后保持 open 状态，"
@@ -89,8 +102,11 @@ class TeacherWindow(QWidget):
         layout.addWidget(self.create_btn)
 
         # 当前 open 的任务提示
+        # W14: 加 padding 加大 + 圆角, 与现代化卡片化对齐
         self.open_task_label = QLabel("当前没有进行中的考勤任务")
-        self.open_task_label.setStyleSheet("padding: 8px; background: #f0f8ff;")
+        self.open_task_label.setStyleSheet(
+            "QLabel { padding: 12px 16px; border-radius: 8px; }"
+        )
         layout.addWidget(self.open_task_label)
         self._refresh_open_task_label()
 
@@ -125,13 +141,21 @@ class TeacherWindow(QWidget):
             self._open_tasks = [t for t in dao.find_by_teacher(self.user.id) if t.status == "open"]
         if not self._open_tasks:
             self.open_task_label.setText("当前没有进行中的考勤任务")
-            self.open_task_label.setStyleSheet("padding: 8px; background: #f0f8ff;")
+            # W14: 中性卡片底色 (白 + 灰边 + 蓝文字)
+            self.open_task_label.setStyleSheet(
+                "QLabel { padding: 12px 16px; border-radius: 8px;"
+                " background-color: #F8FAFC; color: #475569; border: 1px solid #E5E7EB; }"
+            )
         else:
             t = self._open_tasks[0]
             self.open_task_label.setText(
                 f"⏰ 任务 #{t.id} 进行中：{t.start_time:%Y-%m-%d %H:%M} ~ {t.end_time:%H:%M}"
             )
-            self.open_task_label.setStyleSheet("padding: 8px; background: #fff8dc;")
+            # W14: 进行中卡片底色 (淡琥珀 + 琥珀边 + 琥珀字)
+            self.open_task_label.setStyleSheet(
+                "QLabel { padding: 12px 16px; border-radius: 8px;"
+                " background-color: #FFFBEB; color: #92400E; border: 1px solid #FDE68A; }"
+            )
 
     def _get_open_task_id(self) -> int | None:
         """返回当前教师第一个 open 任务的 id；没有则 None。
@@ -184,9 +208,14 @@ class TeacherWindow(QWidget):
     # =====================================================
     def _build_history_tab(self) -> QWidget:
         page = QWidget()
+        # W14: 历史 Tab 整体 margin/spacing 加大
         layout = QVBoxLayout()
+        layout.setContentsMargins(14, 14, 14, 14)
+        layout.setSpacing(12)
 
+        # W14: toolbar 间距加大
         toolbar = QHBoxLayout()
+        toolbar.setSpacing(10)
         self.refresh_btn = QPushButton("刷新")
         self.refresh_btn.clicked.connect(self._refresh_history)
         self.view_detail_btn = QPushButton("查看签到详情")
@@ -211,6 +240,11 @@ class TeacherWindow(QWidget):
         self.history_table.setSelectionBehavior(QAbstractItemView.SelectRows)
         self.history_table.setSelectionMode(QAbstractItemView.SingleSelection)
         self.history_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        # W14 现代化: 斑马纹 + 行高/表头高度加大
+        self.history_table.setAlternatingRowColors(True)
+        self.history_table.verticalHeader().setDefaultSectionSize(TABLE_ROW_HEIGHT)
+        self.history_table.verticalHeader().setVisible(False)
+        self.history_table.horizontalHeader().setFixedHeight(TABLE_HEADER_HEIGHT)
         layout.addWidget(self.history_table)
 
         page.setLayout(layout)

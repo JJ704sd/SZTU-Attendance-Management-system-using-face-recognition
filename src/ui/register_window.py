@@ -34,15 +34,17 @@ class RegisterWindow(QWidget):
 
     def _init_ui(self):
         self.setWindowTitle("注册新账号 — 智能考勤与实验室准入系统")
-        self.resize(480, 600)
-        self.setMinimumWidth(440)
+        # W14 现代化: 窗口宽度 +40 / 高度 +60 容纳 9 个字段不挤
+        self.resize(520, 660)
+        self.setMinimumWidth(480)
 
         # —— 品牌头部（与登录窗同款）——
         header = QWidget()
         header.setObjectName("AuthHeader")
+        # W14: padding 加大 (与 login 一致)
         header_layout = QVBoxLayout(header)
-        header_layout.setContentsMargins(20, 16, 20, 18)
-        header_layout.setSpacing(4)
+        header_layout.setContentsMargins(24, 22, 24, 24)
+        header_layout.setSpacing(6)
 
         top_row = QHBoxLayout()
         top_row.setSpacing(8)
@@ -63,9 +65,10 @@ class RegisterWindow(QWidget):
         form_box = QGroupBox("账号信息")
         form = QFormLayout()
         form.setLabelAlignment(Qt.AlignRight | Qt.AlignVCenter)
-        form.setHorizontalSpacing(12)
-        form.setVerticalSpacing(10)
-        form.setContentsMargins(16, 22, 16, 14)
+        # W14: 现代化间距 —— 横向 SPACING_LG, 纵向 SPACING_MD+2
+        form.setHorizontalSpacing(16)
+        form.setVerticalSpacing(12)
+        form.setContentsMargins(20, 26, 20, 18)
 
         self.username_edit = QLineEdit()
         self.username_edit.setPlaceholderText("3-50 位字母/数字/下划线")
@@ -108,8 +111,9 @@ class RegisterWindow(QWidget):
         self._on_role_changed()
 
         # —— 按钮 ——
+        # W14: 按钮间距加大到 SPACING_LG
         btn_layout = QHBoxLayout()
-        btn_layout.setSpacing(10)
+        btn_layout.setSpacing(12)
         self.submit_btn = QPushButton("提 交 注 册")
         self.submit_btn.setProperty("role", "primary")
         self.submit_btn.clicked.connect(self._on_submit)
@@ -119,9 +123,18 @@ class RegisterWindow(QWidget):
         btn_layout.addWidget(self.back_btn, stretch=1)
 
         # —— 状态栏 ——
+        # W14: 状态 banner 加 padding + 卡片底色, 与 login 一致
         self.status_label = QLabel("提示：带 * 为必填项；学生需填学号与专业方向")
         self.status_label.setObjectName("status")
         self.status_label.setProperty("role", "status")
+        self.status_label.setStyleSheet(
+            "QLabel#status {"
+            " background-color: #FFFFFF;"
+            " border: 1px solid #E5E7EB;"
+            " border-radius: 8px;"
+            " padding: 10px 14px;"
+            "}"
+        )
 
         # —— 主布局 ——
         outer = QVBoxLayout(self)
@@ -129,9 +142,10 @@ class RegisterWindow(QWidget):
         outer.setSpacing(0)
         outer.addWidget(header)
 
+        # W14: body 内外边距/间距加大 (28/26/28/22, spacing 18)
         body = QVBoxLayout()
-        body.setContentsMargins(24, 22, 24, 18)
-        body.setSpacing(14)
+        body.setContentsMargins(28, 26, 28, 22)
+        body.setSpacing(18)
         body.addWidget(form_box)
         body.addLayout(btn_layout)
         body.addWidget(self.status_label)

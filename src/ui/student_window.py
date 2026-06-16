@@ -51,6 +51,10 @@ from src.ui.widgets.qr_scan_widget import QrScanWidget
 
 log = logging.getLogger(__name__)
 
+# W14 现代化: 表格行高/表头高度 —— 与 styles.py 间距尺度保持一致
+TABLE_ROW_HEIGHT = 32       # 单元格高度 (px), 适合 14px 字号 + 8px 上下内边距
+TABLE_HEADER_HEIGHT = 38    # 表头高度 (px), GLOBAL_QSS 已有 10px 上下 padding
+
 # 状态 → (颜色, 文本)
 STATUS_DISPLAY = {
     "present": ("#16A34A", "✅ 出勤"),
@@ -95,10 +99,13 @@ class StudentWindow(QWidget):
 
     def _init_ui(self):
         self.setWindowTitle(f"学生端 — {self.user.real_name}")
-        self.resize(900, 640)
+        # W14 现代化: 窗口高度 +40, 容纳 4 个 Tab + 顶部条更宽松
+        self.resize(960, 680)
 
         # 顶部信息条（与教师端一致风格）
+        # W14: top spacing 加大, 让 welcome 标题与右侧 info 间距更舒展
         top = QHBoxLayout()
+        top.setSpacing(16)
         welcome = QLabel(f"欢迎，{self.user.real_name}{welcome_suffix(self.user)}")
         wf = QFont(); wf.setPointSize(12); wf.setBold(True)
         welcome.setFont(wf)
@@ -133,7 +140,10 @@ class StudentWindow(QWidget):
         self.tabs.currentChanged.connect(self._on_tab_changed)
 
         # 主布局
+        # W14: 主布局 margin/spacing 加大
         main = QVBoxLayout()
+        main.setContentsMargins(12, 12, 12, 12)
+        main.setSpacing(10)
         main.addLayout(top)
         main.addWidget(self.tabs)
         self.setLayout(main)
@@ -155,6 +165,15 @@ class StudentWindow(QWidget):
 
         self.register_status = QLabel("加载中...")
         self.register_status.setProperty("role", "status")
+        # W14 现代化: 状态 banner 加 padding + 卡片底色 (与登录/注册一致)
+        self.register_status.setStyleSheet(
+            "QLabel {"
+            " background-color: #FFFFFF;"
+            " border: 1px solid #E5E7EB;"
+            " border-radius: 8px;"
+            " padding: 10px 14px;"
+            "}"
+        )
         layout.addWidget(self.register_status)
 
         # 摄像头预览
@@ -280,11 +299,17 @@ class StudentWindow(QWidget):
         三个子 Tab 互相独立, 通过监听 signin_succeeded 信号做「先到先签」灰显.
         """
         page = QWidget()
+        # W14: 签到 Tab 整体间距加大
         layout = QVBoxLayout()
+        layout.setSpacing(12)
+        layout.setContentsMargins(14, 14, 14, 14)
 
         # ===== 顶部: 任务下拉 + 「你已签到」提示 =====
+        # W14: top_row 间距加大, 让任务下拉区与 banner 不挤
         top_row = QVBoxLayout()
+        top_row.setSpacing(10)
         task_row = QHBoxLayout()
+        task_row.setSpacing(10)
         task_row.addWidget(QLabel("考勤任务:"))
         self.task_combo = QComboBox()
         self.task_combo.setMinimumWidth(300)
@@ -408,6 +433,16 @@ class StudentWindow(QWidget):
         self.signin_status = QLabel("就绪 — 选择任务后点击「开始签到」")
         self.signin_status.setProperty("role", "status")
         self.signin_status.setWordWrap(True)
+        # W14 现代化: 状态 banner 加大 padding, warning 视觉态更明显
+        self.signin_status.setStyleSheet(
+            "QLabel {"
+            " background-color: #FFFFFF;"
+            " border: 1px solid #E5E7EB;"
+            " border-radius: 8px;"
+            " padding: 12px 16px;"
+            " font-size: 13px;"
+            "}"
+        )
         layout.addWidget(self.signin_status)
 
         # 按钮
@@ -625,6 +660,12 @@ class StudentWindow(QWidget):
         )
         self.attendance_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self.attendance_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        # W14 现代化: 斑马纹 + 行高/表头高度加大
+        self.attendance_table.setAlternatingRowColors(True)
+        self.attendance_table.verticalHeader().setDefaultSectionSize(TABLE_ROW_HEIGHT)
+        self.attendance_table.verticalHeader().setVisible(False)
+        self.attendance_table.horizontalHeader().setFixedHeight(TABLE_HEADER_HEIGHT)
+        self.attendance_table.setSelectionBehavior(QAbstractItemView.SelectRows)
         layout.addWidget(self.attendance_table)
 
         page.setLayout(layout)
@@ -687,6 +728,12 @@ class StudentWindow(QWidget):
         )
         self.leave_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self.leave_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        # W14 现代化: 斑马纹 + 行高/表头高度加大
+        self.leave_table.setAlternatingRowColors(True)
+        self.leave_table.verticalHeader().setDefaultSectionSize(TABLE_ROW_HEIGHT)
+        self.leave_table.verticalHeader().setVisible(False)
+        self.leave_table.horizontalHeader().setFixedHeight(TABLE_HEADER_HEIGHT)
+        self.leave_table.setSelectionBehavior(QAbstractItemView.SelectRows)
         layout.addWidget(self.leave_table)
 
         page.setLayout(layout)
