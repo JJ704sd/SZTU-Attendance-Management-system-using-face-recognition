@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <title>签到 - 智能考勤系统</title>
+  <style>
+    /* 移动端卡片式 H5 签到页 (W14 新增)
+       - 蓝白主题, 与 src/ui/styles.py 的 COLOR_PRIMARY/COLOR_BG 对齐
+       - 不用任何外部 CSS/JS 依赖 (H5 单页, 离线 + 局域网加载也稳)
+    */
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei UI", sans-serif;
+      background: linear-gradient(180deg, #EFF6FF 0%, #F1F5F9 100%);
+      margin: 0; padding: 16px; min-height: 100vh;
+      display: flex; align-items: center; justify-content: center;
+      color: #1E293B;
+    }
+    .card {
+      background: #FFFFFF;
+      border-radius: 14px;
+      padding: 24px 20px;
+      max-width: 380px; width: 100%;
+      box-shadow: 0 6px 24px rgba(30, 64, 175, 0.08);
+    }
+    h1 {
+      font-size: 20px; margin: 0 0 6px; color: #1E40AF;
+      font-weight: 700; letter-spacing: 0.3px;
+    }
+    .sub {
+      color: #64748B; font-size: 13px; margin-bottom: 18px;
+      line-height: 1.5;
+    }
+    .sub b { color: #1E40AF; font-weight: 600; }
+    label {
+      display: block; font-size: 13px; color: #475569;
+      margin-bottom: 6px; font-weight: 500;
+    }
+    input {
+      width: 100%; padding: 12px 14px;
+      border: 1px solid #CBD5E1; border-radius: 10px;
+      font-size: 16px; background: #F8FAFC;
+      margin-bottom: 14px; outline: none;
+      transition: border-color 0.15s, background 0.15s;
+    }
+    input:focus { border-color: #2563EB; background: #FFFFFF; }
+    button {
+      width: 100%; padding: 14px; background: #2563EB; color: white;
+      border: 0; border-radius: 10px;
+      font-size: 16px; font-weight: 600;
+      cursor: pointer; margin-top: 4px;
+      transition: background 0.15s, transform 0.05s;
+    }
+    button:hover  { background: #1D4ED8; }
+    button:active { transform: scale(0.98); }
+    button:disabled { background: #94A3B8; cursor: not-allowed; }
+    .result {
+      margin-top: 18px; padding: 14px; border-radius: 10px;
+      text-align: center; font-size: 15px; line-height: 1.6;
+      animation: fadeIn 0.2s ease-out;
+    }
+    .ok  { background: #DCFCE7; color: #166534; border: 1px solid #BBF7D0; }
+    .err { background: #FEE2E2; color: #991B1B; border: 1px solid #FECACA; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
+    .footer { text-align: center; margin-top: 16px; color: #94A3B8; font-size: 11px; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>📚 智能考勤签到</h1>
+    <div class="sub">
+      任务 #<b>{{ task_id }}</b> — 请输入学号和密码完成签到
+    </div>
+    <form id="f" autocomplete="on">
+      <label for="student_id">学号 / 用户名</label>
+      <input id="student_id" name="student_id" placeholder="例如 2021001"
+             autocomplete="username" required>
+
+      <label for="password">密码</label>
+      <input id="password" name="password" type="password" placeholder="登录密码"
+             autocomplete="current-password" required>
+
+      <button type="submit" id="submit_btn">立即签到</button>
+    </form>
+    <div id="result"></div>
+    <div class="footer">Powered by 智能考勤系统 · 仅当前 open 任务有效</div>
+  </div>
+
+  <script>
+    // W14 H5: 从 server 渲染时注入的 task_id / token, 提交时回传
+    (function () {
+      var f = document.getElementById('f');
+      var result = document.getElementById('result');
+      var btn = document.getElementById('submit_btn');
+      var taskId = {{ task_id }};
+      var token = {{ token | tojson }};
+
+      function showResult(ok, html, allowRetry) {
+        result.className = 'result ' + (ok ? 'ok' : 'err');
+        result.innerHTML = html;
+        if (allowRetry) {
+          btn.disabled = false;
+          btn.textContent = '立即签到';
+        }
+      }
+
+      f.addEventListener('submit', async function (e) {
+        e.preventDefault();
+        btn.disabled = true;
+        btn.textContent = '签到中…';
+        result.className = 'result';
+        result.innerHTML = '';
+
+        var fd = new FormData(f);
+        var payload = {
+          task_id:    taskId,
+          token:      token,
+          student_id: (fd.get('student_id') || '').trim(),
+          password:   fd.get('password') || ''
+        };
+        try {
+          var resp = await fetch('/api/signin', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          });
+          var data;
+          try { data = await resp.json(); }
+          catch (_) {
+            showResult(false, '✗ 服务异常 (' + resp.status + '), 请重试', true);
+            return;
+          }
+          if (data.ok) {
+            var t = data.sign_in_time || '';
+            var status = data.status === 'late' ? '迟到' : '签到';
+            showResult(true,
+              '✓ ' + (data.student_name || '已签到') + ' ' + status + '成功<br>' +
+              '<span style="font-size:12px;color:#15803D;">' + t + '</span>',
+              false /* 不允许重试, 已经成功 */
+            );
+          } else {
+            // 错误码 → 友好文案
+            var msg = data.msg || '签到失败';
+            var hint = '';
+            if (data.error === 'ALREADY_SIGNED') hint = '<br><span style="font-size:12px;">无需重复提交</span>';
+            else if (data.error === 'CODE_INVALID') hint = '<br><span style="font-size:12px;">请重新扫描教师屏幕</span>';
+            showResult(false, '✗ ' + msg + hint, true);
+          }
+        } catch (err) {
+          showResult(false, '✗ 网络异常，请重试', true);
+        }
+      });
+    })();
+  </script>
+</body>
+</html>

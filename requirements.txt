@@ -26,3 +26,11 @@ matplotlib==3.10.9  # 3.9+ 起支持 numpy 2.x；3.8.x 仍要求 numpy<2 会和 
 
 # --- 测试 ---
 pytest>=8.0
+
+# --- W14: 多端登录签到 (FastAPI 嵌入) ---
+# fastapi 负责 H5 路由 + JSON 响应；uvicorn 是 ASGI server；
+# jinja2 渲染 signin.html；httpx 是测试端 client (替代 requests 走同步 API)。
+fastapi==0.115.0
+uvicorn[standard]==0.32.0
+jinja2==3.1.4
+httpx==0.27.2

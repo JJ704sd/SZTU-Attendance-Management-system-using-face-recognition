@@ -72,6 +72,10 @@ class Config:
     # 安全
     LOGIN_MAX_ATTEMPTS = _get_int("LOGIN_MAX_ATTEMPTS", 5)
 
+    # W14: 多端登录签到本地 HTTP 服务（教师端弹二维码 → 手机扫码 → H5 签到）
+    # 默认 5180，冲突时 SigninWebServer.start() 自动 +1 重试 1 次
+    SIGNIN_WEB_PORT = _get_int("SIGNIN_WEB_PORT", 5180)
+
     # 路径
     ASSETS_DIR = PROJECT_ROOT / "src" / "assets"
     PROJECT_ROOT = PROJECT_ROOT
