@@ -24,7 +24,8 @@ class TaskDetailDialog(QDialog):
 
     def _init_ui(self):
         self.setWindowTitle(f"任务 #{self.task_id} 签到详情")
-        self.resize(720, 500)
+        # W14+ 演示模式: 窗口 +160x100, 表格更舒展
+        self.resize(880, 600)
 
         self.title_label = QLabel("加载中...")
         title_font = QFont()

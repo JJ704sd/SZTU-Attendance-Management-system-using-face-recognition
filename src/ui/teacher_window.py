@@ -36,12 +36,14 @@ class TeacherWindow(QWidget):
         super().__init__()
         self.user = user  # 已登录的教师 User
         self.attendance = AttendanceService()
+        # W15+: 当前签到码弹窗引用 (用于"重复点二维码签到"时复用 stop 老 web_server)
+        self.signin_code_win = None
         self._init_ui()
 
     def _init_ui(self):
         self.setWindowTitle(f"教师端 — {self.user.real_name}")
-        # W14 现代化: 窗口高度 +40
-        self.resize(960, 640)
+        # W14+ 演示模式: 窗口 +240x160 容纳更大字号和摄像头, 1080P 投影不挤
+        self.resize(1200, 800)
 
         # 顶部
         # W14: top spacing 加大
@@ -49,7 +51,8 @@ class TeacherWindow(QWidget):
         top.setSpacing(16)
         welcome = QLabel(f"欢迎，{self.user.real_name}{welcome_suffix(self.user)}")
         welcome_font = QFont()
-        welcome_font.setPointSize(12)
+        # W14+ 演示模式: Welcome 字号 12→15, 投影清晰
+        welcome_font.setPointSize(15)
         welcome_font.setBold(True)
         welcome.setFont(welcome_font)
         top.addWidget(welcome)
@@ -199,6 +202,24 @@ class TeacherWindow(QWidget):
             return
 
         from src.ui.widgets.signin_code_dialog import SigninCodeDialog
+
+        # W15+: 复用现有 dialog + web_server, 避免端口残留
+        if self.signin_code_win is not None:
+            try:
+                old_win = self.signin_code_win
+                old_web = getattr(old_win, "web_server", None)
+                if old_web is not None:
+                    try:
+                        old_web.stop()
+                        log.info("复用检查: stop 老的 SigninWebServer (port=%s)", old_web.port)
+                    except Exception as e:
+                        log.debug("stop 老 web_server 异常 (忽略): %s", e)
+                old_win.close()
+                old_win.deleteLater()
+            except Exception as e:
+                log.debug("关老 dialog 异常 (忽略): %s", e)
+            finally:
+                self.signin_code_win = None
 
         # W14: 仅 qr 类型启 web_server，digit 保持原行为（不启服务）
         web_server = None

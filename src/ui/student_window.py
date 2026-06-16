@@ -99,15 +99,16 @@ class StudentWindow(QWidget):
 
     def _init_ui(self):
         self.setWindowTitle(f"学生端 — {self.user.real_name}")
-        # W14 现代化: 窗口高度 +40, 容纳 4 个 Tab + 顶部条更宽松
-        self.resize(960, 680)
+        # W14+ 演示模式: 窗口 +240x140 容纳更大字号和摄像头
+        self.resize(1200, 820)
 
         # 顶部信息条（与教师端一致风格）
         # W14: top spacing 加大, 让 welcome 标题与右侧 info 间距更舒展
         top = QHBoxLayout()
         top.setSpacing(16)
         welcome = QLabel(f"欢迎，{self.user.real_name}{welcome_suffix(self.user)}")
-        wf = QFont(); wf.setPointSize(12); wf.setBold(True)
+        # W14+ 演示模式: Welcome 字号 12→15
+        wf = QFont(); wf.setPointSize(15); wf.setBold(True)
         welcome.setFont(wf)
         top.addWidget(welcome)
         top.addStretch()
@@ -178,7 +179,8 @@ class StudentWindow(QWidget):
 
         # 摄像头预览
         self.register_camera = CameraWidget()
-        self.register_camera.setMinimumSize(480, 360)
+        # W14+ 演示模式: 摄像头最小尺寸 480x360 → 640x480, 人脸更清晰
+        self.register_camera.setMinimumSize(640, 480)
         self.register_camera.set_overlay_callback(self._draw_face_boxes)
         layout.addWidget(self.register_camera)
 
@@ -425,7 +427,8 @@ class StudentWindow(QWidget):
         layout = QVBoxLayout()
 
         # 摄像头 (已在 __init__ 创建 self.signin_camera, 这里直接 add 进来 + 配 overlay)
-        self.signin_camera.setMinimumSize(480, 360)
+        # W14+ 演示模式: 摄像头最小尺寸 480x360 → 640x480
+        self.signin_camera.setMinimumSize(640, 480)
         self.signin_camera.set_overlay_callback(self._draw_face_boxes)
         layout.addWidget(self.signin_camera)
 

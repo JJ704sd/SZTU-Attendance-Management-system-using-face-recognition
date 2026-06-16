@@ -52,13 +52,14 @@ class CameraWidget(QWidget):
         self._init_ui()
 
     def _init_ui(self):
-        self.setMinimumSize(320, 240)
+        # W14+ 演示模式: 摄像头内部最小尺寸 320x240 → 480x360
+        self.setMinimumSize(480, 360)
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
 
         self._label = QLabel("摄像头未启动")
         self._label.setAlignment(Qt.AlignCenter)
         self._label.setStyleSheet("color: gray; background-color: #0F172A;")
-        self._label.setMinimumSize(320, 240)
+        self._label.setMinimumSize(480, 360)
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)

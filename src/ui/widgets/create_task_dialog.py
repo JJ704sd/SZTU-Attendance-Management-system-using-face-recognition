@@ -25,7 +25,8 @@ class CreateTaskDialog(QDialog):
     def _init_ui(self):
         self.setWindowTitle("发起新考勤")
         self.setModal(True)
-        self.resize(420, 280)
+        # W14+ 演示模式: 窗口 +60x60
+        self.resize(480, 340)
 
         layout = QVBoxLayout()
         intro = QLabel("填写以下信息创建考勤任务：")

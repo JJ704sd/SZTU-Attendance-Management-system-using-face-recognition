@@ -37,14 +37,15 @@ class AdminWindow(QWidget):
 
     def _init_ui(self):
         self.setWindowTitle(f"实验室管理员端 — {self.user.real_name}")
-        # W14 现代化: 窗口尺寸加大 (高度 +40, 宽度 +40 容纳 matplotlib 4 类图)
-        self.resize(1140, 740)
+        # W14+ 演示模式: 窗口 +140x120 容纳 matplotlib 大字号坐标 + 表格更舒展
+        self.resize(1280, 860)
 
         # W14: 顶部信息条 spacing 加大, 与 teacher/student 风格一致
         top = QHBoxLayout()
         top.setSpacing(16)
         welcome = QLabel(f"欢迎，{self.user.real_name}{welcome_suffix(self.user)}")
-        f = QFont(); f.setPointSize(12); f.setBold(True)
+        # W14+ 演示模式: Welcome 字号 12→15
+        f = QFont(); f.setPointSize(15); f.setBold(True)
         welcome.setFont(f)
         top.addWidget(welcome)
         top.addStretch()

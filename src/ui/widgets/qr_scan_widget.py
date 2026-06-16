@@ -91,7 +91,8 @@ class QrScanWidget(QWidget):
 
         # 摄像头
         self.camera = CameraWidget()
-        self.camera.setMinimumSize(480, 360)
+        # W14+ 演示模式: 摄像头最小尺寸 480x360 → 640x480
+        self.camera.setMinimumSize(640, 480)
         layout.addWidget(self.camera)
 
         # 状态

@@ -32,8 +32,10 @@ from sqlalchemy import and_
 
 from src.config import Config
 from src.dao.user_dao import UserDao
+from src.dao.task_signin_code_dao import TaskSigninCodeDao
 from src.db import session_scope
 from src.models.attendance import AttendanceRecord, AttendanceTask
+from src.models.task_signin_code import TaskSigninCode
 from src.services.attendance_service import AttendanceService
 from src.services.auth_service import AuthError, AuthService
 from src.utils.network import get_lan_ip
@@ -159,20 +161,35 @@ def build_signin_app(task_id: int, token: str, expires_at) -> FastAPI:
     # ----------------------------------------------------------
     @app.get("/signin/{tid}/{tok}", response_class=HTMLResponse)
     async def signin_page(tid: int, tok: str, request: Request):
-        # URL 不匹配 (教师刷新了码, 旧 URL 还在) → 友好提示
-        if tid != task_id or tok != token:
+        # W15+ 修复: 删除 tok != token 检查!
+        # 之前这里校验 URL 里的 tok == build_signin_app 闭包 token,
+        # 但 web_server.token 是启时定死的, 跟 DB LIVE token 永远不一致
+        # (dialog 启动时 _generate_code 又 generate 一次会 deactive 闭包里的 token,
+        #  即使有 update_token 同步, 老 URL 缓存的 tok 还是会触发 400).
+        # 正确做法: H5 入口只校验 task_id, 真实 token 校验让 H5 polling 拿
+        # /api/signin/latest 自己处理 (见 api_signin 修法 A).
+        if tid != task_id:
             return HTMLResponse(
                 "<!DOCTYPE html><html><body style='font-family:sans-serif;"
                 "padding:40px;text-align:center;'>"
-                "<h1>⏰ 签到码已失效</h1>"
-                "<p>请重新扫描教师屏幕上的二维码。</p>"
+                "<h1>签到任务不存在</h1>"
+                "<p>该任务已结束或被删除, 请联系教师。</p>"
                 "</body></html>",
                 status_code=400,
             )
+        # W15+: 传 expires_at ISO 字符串给前端, 让 H5 实时显示倒计时 + 到期禁用按钮
+        # expires_at 来自 build_signin_app 闭包 (SigninWebServer 持有的同一对象)
+        expires_iso = None
+        if expires_at is not None:
+            try:
+                expires_iso = expires_at.isoformat()
+            except AttributeError:
+                expires_iso = str(expires_at)
         return templates.TemplateResponse("signin.html", {
-            "request": request,
-            "task_id": task_id,
-            "token":   token,
+            "request":     request,
+            "task_id":     task_id,
+            "token":       token,
+            "expires_iso": expires_iso,
         })
 
     # ----------------------------------------------------------
@@ -184,6 +201,37 @@ def build_signin_app(task_id: int, token: str, expires_at) -> FastAPI:
         return {"ok": True, **meta}
 
     # ----------------------------------------------------------
+    # GET /api/signin/latest?task={id} — 当前 task 的最新 LIVE token (W15+ 防缓存)
+    # ----------------------------------------------------------
+    @app.get("/api/signin/latest")
+    async def api_signin_latest(task: int):
+        """返当前 task 最新有效 (is_active=1 + 未过期) 的 qr token.
+
+        W15+: H5 进入后每 3 秒 polling 一次, 始终用最新 token 提交,
+              即使教师中途刷新了码 (老 URL 缓存也不会失效).
+        返回字段: ok, task_id, token, expires_at, seconds_to_expire.
+        无 LIVE token → 404 NO_LIVE_TOKEN.
+        """
+        from sqlalchemy import desc as _desc
+        with session_scope() as s:
+            code = s.query(TaskSigninCode).filter(
+                TaskSigninCode.task_id == task,
+                TaskSigninCode.code_type == "qr",
+                TaskSigninCode.is_active == 1,
+                TaskSigninCode.expires_at > datetime.now(),
+            ).order_by(_desc(TaskSigninCode.created_at)).first()
+            if not code:
+                return _err("NO_LIVE_TOKEN", "该任务暂无有效签到码 (教师尚未发起或已过期)", status=404)
+            seconds_left = int((code.expires_at - datetime.now()).total_seconds())
+            return {
+                "ok": True,
+                "task_id": task,
+                "token": code.code_value,
+                "expires_at": code.expires_at.isoformat(),
+                "seconds_to_expire": seconds_left,
+            }
+
+    # ----------------------------------------------------------
     # POST /api/signin — 学生提交学号+密码+token
     # ----------------------------------------------------------
     @app.post("/api/signin")
@@ -191,11 +239,13 @@ def build_signin_app(task_id: int, token: str, expires_at) -> FastAPI:
         """Body: {task_id:int, token:str, student_id:str, password:str}
 
         流程:
-          1. 校验请求参数完整性 + task_id/token 匹配
-          2. 查 user (支持学号或 username)
-          3. auth_service.login() — 复用 (含 LOGIN_MAX_ATTEMPTS 锁定)
-          4. attendance_service.sign_in_by_qr() — 复用 (写 signin_method='qr')
-          5. 返回 {ok, status, student_name, sign_in_time}
+          1. 校验请求参数完整性 + task_id 匹配
+          2. W15+ 修复: token 校验改成从 DB 查 task_signin_code 表
+             (不再用闭包捕获的 token 对比, 否则教师刷新码后老 H5 URL 全失效)
+          3. 查 user (支持学号或 username)
+          4. auth_service.login() — 复用 (含 LOGIN_MAX_ATTEMPTS 锁定)
+          5. attendance_service.sign_in_by_qr() — 复用 (写 signin_method='qr')
+          6. 返回 {ok, status, student_name, sign_in_time}
         """
         student_id = (payload.get("student_id") or "").strip()
         password   = payload.get("password") or ""
@@ -203,8 +253,16 @@ def build_signin_app(task_id: int, token: str, expires_at) -> FastAPI:
         tok        = payload.get("token") or ""
         if not (student_id and password and isinstance(tid, int) and tok):
             return _err("BAD_REQUEST", "请求参数不完整", status=400)
-        if tid != task_id or tok != token:
+        if tid != task_id:
             return _err("CODE_INVALID", "签到码无效或已过期", status=400)
+
+        # W15+ 修复: token 校验从 DB 实时查 (task_signin_code 表 is_active=1 + 未过期)
+        # 这样即使教师刷新了码, 老 H5 页面 (老 token) 提交时也能正确拒绝, 而不是误判.
+        with session_scope() as s:
+            dao = TaskSigninCodeDao(s)
+            valid_code = dao.find_active_by_value(task_id, "qr", tok)
+            if not valid_code:
+                return _err("CODE_INVALID", "签到码无效或已过期", status=400)
 
         # 1) 查 user
         user, err = _lookup_user(student_id)
@@ -277,7 +335,8 @@ class SigninWebServer:
 
     def __init__(self, task_id: int, token: str, expires_at,
                  host: str = "0.0.0.0",
-                 port: Optional[int] = None):
+                 port: Optional[int] = None,
+                 watchdog: bool = True):
         self.task_id = task_id
         self.token   = token
         self.expires_at = expires_at
@@ -287,6 +346,10 @@ class SigninWebServer:
         self._server: Optional[uvicorn.Server] = None
         self._thread: Optional[threading.Thread] = None
         self._lock = threading.Lock()
+        # W15+: watchdog (5s ping, 3 次失败自动重建)
+        self._enable_watchdog = watchdog
+        self._wd_stop: Optional[threading.Event] = None
+        self._wd_thread: Optional[threading.Thread] = None
 
     # -----------------------------------------------------
     # 给 UI 用的两个属性
@@ -350,8 +413,14 @@ class SigninWebServer:
             self._thread.start()
             log.info("SigninWebServer 已启动: %s", self.url)
 
+        # W15+: 启 watchdog (在 self._lock 外启, 避免 watchdog 也持锁死锁)
+        if self._enable_watchdog:
+            self._start_watchdog()
+
     def stop(self, timeout: float = 3.0):
         """优雅停 uvicorn (should_exit=True + join). 不挂的兜底: daemon=True."""
+        # W15+: 先停 watchdog 避免它在 server 死后还尝试 ping
+        self._stop_watchdog()
         with self._lock:
             if self._server is not None:
                 self._server.should_exit = True
@@ -360,3 +429,137 @@ class SigninWebServer:
             t.join(timeout=timeout)
             if t.is_alive():
                 log.warning("SigninWebServer 线程未在 %.1fs 内退出 (daemon, 主进程退出时会清)", timeout)
+
+    # -----------------------------------------------------
+    # W15+: update_token (二维码内容跟随教师刷新)
+    # -----------------------------------------------------
+    def update_token(self, new_token: str):
+        """同步 token, 重 build FastAPI app + restart uvicorn.
+
+        背景 (W15+ 修复):
+          教师点"刷新码" → DB 写新 token → 但 web_server FastAPI app 闭包里
+          仍是旧 token, 二维码图片 (self.url) 也指向旧 URL, 学生扫码还是老 H5.
+          现在 update_token 后 self.url 立刻反映新 token, _render_code 重新画
+          出来的二维码就是新 URL.
+
+        副作用:
+          - restart 期间 (几百 ms) 学生提交会被 503. 教师刚点完刷新码的瞬间,
+            不太可能有学生正好提交, 风险低.
+          - 端口保持不变 (用 SO_REUSEADDR 等机制 uvicorn 一般能 bind 回去).
+
+        Raises:
+            RuntimeError: 重启失败时. 调用方应 try/except 后决定降级策略.
+        """
+        with self._lock:
+            if new_token == self.token:
+                log.debug("update_token: token 未变, 跳过")
+                return
+            log.info("SigninWebServer token 更新: %s -> %s", self.token[:8], new_token[:8])
+            self.token = new_token
+
+            # 1) 停老 server + 等老线程退出
+            if self._server is not None:
+                self._server.should_exit = True
+            old_thread = self._thread
+            self._server = None
+            self._thread = None
+        if old_thread is not None:
+            old_thread.join(timeout=3.0)
+            if old_thread.is_alive():
+                log.warning("SigninWebServer 老线程未退出, 继续 restart (新闭包可能端口冲突)")
+
+        # 2) 起新 server (新 _build_server 会用 self.token = new_token 捕获)
+        with self._lock:
+            try:
+                self._server = self._build_server()
+                self._thread = threading.Thread(
+                    target=self._server.run,
+                    daemon=True,
+                    name="signin-web",
+                )
+                self._thread.start()
+            except Exception as e:
+                log.exception("update_token restart 失败: %s", e)
+                raise RuntimeError(f"SigninWebServer.update_token 重启失败: {e}") from e
+        log.info("SigninWebServer token 已更新: 新 url=%s", self.url)
+
+    # -----------------------------------------------------
+    # W15+: watchdog 自动重建
+    # -----------------------------------------------------
+    def _start_watchdog(self):
+        """启 watchdog 线程: 每 5s ping /api/health, 3 次失败自动重建."""
+        if self._wd_thread is not None and self._wd_thread.is_alive():
+            return  # 已启
+        self._wd_stop = threading.Event()
+        self._wd_thread = threading.Thread(
+            target=self._watchdog_loop,
+            daemon=True,
+            name="signin-web-watchdog",
+        )
+        self._wd_thread.start()
+        log.info("SigninWebServer watchdog 已启动 (5s 间隔)")
+
+    def _stop_watchdog(self):
+        if self._wd_stop is not None:
+            self._wd_stop.set()
+        t = self._wd_thread
+        if t is not None:
+            t.join(timeout=2.0)
+        self._wd_thread = None
+        self._wd_stop = None
+
+    def _watchdog_loop(self):
+        """每 5s 用 httpx ping localhost, 3 次失败 → 重建 server.
+
+        httpx 是 fastapi 测试已有依赖 (requirements.txt), 不增加新包.
+        """
+        import httpx  # 延迟导入, 启动快
+        fail_count = 0
+        while not self._wd_stop.is_set():
+            ok = False
+            try:
+                r = httpx.get(f"http://127.0.0.1:{self.port}/api/health", timeout=2.0)
+                ok = r.status_code == 200
+            except Exception:
+                ok = False
+            if ok:
+                fail_count = 0
+            else:
+                fail_count += 1
+                log.debug("watchdog: ping port=%s 失败 (count=%s)", self.port, fail_count)
+            if fail_count >= 3:
+                log.warning(
+                    "watchdog: port=%s 连续 3 次失败, 重建 server",
+                    self.port,
+                )
+                try:
+                    # 重 build + restart (走类似 update_token 的逻辑, 但不动 token)
+                    self._rebuild_server()
+                    fail_count = 0
+                except Exception as e:
+                    log.exception("watchdog 重建失败: %s", e)
+                    fail_count = 0  # 别无限重试, 等下一轮
+            # 等 5 秒 (或被 stop 唤醒)
+            if self._wd_stop.wait(5.0):
+                break
+        log.debug("SigninWebServer watchdog 退出")
+
+    def _rebuild_server(self):
+        """不停 token, 重建 server (watchdog 用). 与 update_token 共享大部分逻辑."""
+        with self._lock:
+            if self._server is not None:
+                self._server.should_exit = True
+            old_thread = self._thread
+            self._server = None
+            self._thread = None
+        if old_thread is not None:
+            old_thread.join(timeout=3.0)
+        with self._lock:
+            self._server = self._build_server()
+            self._thread = threading.Thread(
+                target=self._server.run,
+                daemon=True,
+                name="signin-web",
+            )
+            self._thread.start()
+        log.info("watchdog: server 已重建, url=%s", self.url)

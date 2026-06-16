@@ -54,9 +54,10 @@ SHADOW_MODAL = "0 8px 24px rgba(0,0,0,0.12)"                            # 弹窗
 # 3. Design Tokens —— 字体
 # =====================================================================
 FONT_FAMILY = "Microsoft YaHei UI"  # Win 自带；缺字回落到系统默认
-FONT_SIZE_BASE = "14px"
-FONT_SIZE_TITLE = "16px"
-FONT_SIZE_HEADING = "20px"
+# W14+ 演示模式: 答辩/录屏场景字号 +2-6px, 1080P 投影 / 笔记本 14" 都不挤
+FONT_SIZE_BASE = "16px"      # 14 → 16, 全局 base 文字 (表单/列表/正文)
+FONT_SIZE_TITLE = "18px"     # 16 → 18, Tab/卡片标题
+FONT_SIZE_HEADING = "26px"   # 20 → 26, 大标题 (Welcome、弹窗头)
 FONT_WEIGHT_BOLD = "600"
 
 # =====================================================================

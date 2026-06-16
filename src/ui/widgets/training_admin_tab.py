@@ -36,7 +36,8 @@ class TrainingEditDialog(QDialog):
         super().__init__(parent)
         self.training = training
         self.setWindowTitle("编辑培训记录" if training else "新增培训记录")
-        self.resize(440, 360)
+        # W14+ 演示模式: 窗口 +80x60
+        self.resize(520, 420)
         self._init_ui()
         if training:
             self._load_from(training)

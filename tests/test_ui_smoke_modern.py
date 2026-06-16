@@ -222,8 +222,8 @@ def test_admin_window_constructs(qapp, mock_db):
 # 风格 / 现代化 验收
 # ============================================================
 def test_all_windows_have_modernized_resize(qapp, mock_db):
-    """5 窗口的 W14 现代化尺寸生效 (login 460x540 / register 520x660 /
-    student 960x680 / teacher 960x640 / admin 1140x740)."""
+    """5 窗口的 W14+ 演示模式尺寸生效 (login 520x620 / register 580x740 /
+    student 1200x820 / teacher 1200x800 / admin 1280x860, 1080P 投影友好)."""
     from src.ui.login_window import LoginWindow
     from src.ui.register_window import RegisterWindow
     from src.ui.student_window import StudentWindow
@@ -231,11 +231,11 @@ def test_all_windows_have_modernized_resize(qapp, mock_db):
     from src.ui.admin_window import AdminWindow
 
     checks = [
-        (LoginWindow(), 460, 540),
-        (RegisterWindow(), 520, 660),
-        (StudentWindow(_make_fake_user("student")), 960, 680),
-        (TeacherWindow(_make_fake_user("teacher")), 960, 640),
-        (AdminWindow(_make_fake_user("lab_admin")), 1140, 740),
+        (LoginWindow(), 520, 620),
+        (RegisterWindow(), 580, 740),
+        (StudentWindow(_make_fake_user("student")), 1200, 820),
+        (TeacherWindow(_make_fake_user("teacher")), 1200, 800),
+        (AdminWindow(_make_fake_user("lab_admin")), 1280, 860),
     ]
     try:
         for w, w_w, w_h in checks:

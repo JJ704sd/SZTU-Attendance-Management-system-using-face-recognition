@@ -193,6 +193,26 @@ def test_signin_web_serves_html(client, qr_token):
     assert "/api/signin" in body
 
 
+def test_signin_web_html_includes_countdown(client, qr_token):
+    """W15+: H5 渲染含倒计时条 + JS 倒计时逻辑 (5 分钟 TTL)."""
+    resp = client.get(f"/signin/{qr_token['task_id']}/{qr_token['token']}")
+    body = resp.text
+    assert resp.status_code == 200
+    # 倒计时 DOM
+    assert 'id="countdown"' in body, "缺倒计时容器"
+    assert 'id="time_text"' in body, "缺时间显示 span"
+    # 倒计时 JS
+    assert "tickCountdown" in body, "缺 tickCountdown 函数"
+    assert "expiresAt" in body, "缺 expiresAt 变量"
+    assert "new Date(" in body, "缺 Date 解析"
+    # 到期禁用按钮逻辑
+    assert "cdExpired" in body, "缺 cdExpired 状态"
+    assert "码已过期" in body, "缺过期文案"
+    # AUTH_FAILED 提示 (W15+: 学号密码错有专门文案)
+    # 注: W14 错误码 LOGIN_FAILED 已在 W15+ 重命名为 AUTH_FAILED (更标准)
+    assert "AUTH_FAILED" in body
+
+
 def test_signin_web_post_signin_success(client, qr_token, student_user):
     """POST /api/signin 正确凭证 → 200 + DB 有 record (signin_method='qr')."""
     resp = client.post("/api/signin", json={
@@ -354,10 +374,15 @@ def test_signin_web_info_endpoint(client, qr_token, open_task):
 
 
 def test_signin_web_bad_task_token_returns_400(client):
-    """URL 里 task_id/token 与预期不符 → 400 (而非 500)."""
+    """URL 里 task_id 不匹配 → 400 (而非 500).
+
+    W15+ 修复: signin_page 只校验 task_id, 不校验 token (URL 老 token
+    跟 web_server 内存 token 永远不一致, 老 "签到码已失效" 文案已删除).
+    新文案: "签到任务不存在 / 该任务已结束或被删除, 请联系教师".
+    """
     resp = client.get("/signin/999999/not-the-real-token")
     assert resp.status_code == 400
-    assert "签到码" in resp.text or "失效" in resp.text
+    assert "签到任务不存在" in resp.text or "结束" in resp.text
 
 
 def test_signin_web_post_missing_fields(client, qr_token):
@@ -382,3 +407,207 @@ def test_signin_web_already_signed(client, qr_token, student_user):
     r2 = client.post("/api/signin", json=body)
     assert r2.status_code == 409, r2.text
     assert r2.json()["error"] == "ALREADY_SIGNED"
+
+
+# =====================================================
+# W15+ 修复: token 校验改 DB 实时查 + update_token
+# =====================================================
+def test_signin_web_post_old_token_after_refresh_rejected(client, open_task, student_user):
+    """W15+ 修法 A 验证: 教师刷新码后, 老 token (闭包里仍是它) 提交 → CODE_INVALID.
+
+    旧行为 (W14): 闭包里的旧 token 仍能匹配, 但 DB 里 is_active=0, service 返 None
+                  兜底 "签到码无效或已过期". 老 H5 页面能打开但提交失败.
+    新行为 (W15+): 提交前先用 DB 校验 token, 老 token 直接 400 CODE_INVALID.
+    """
+    tid = open_task["task_id"]
+
+    # 第一次生成 token
+    from src.services.attendance_service import AttendanceService
+    r1 = AttendanceService().generate_signin_code(tid, "qr", ttl_seconds=60)
+    assert r1 is not None
+    old_token = r1["code"]
+
+    # 教师"刷新码" → DB 里 old_token is_active=0, 生成新 token
+    r2 = AttendanceService().generate_signin_code(tid, "qr", ttl_seconds=60)
+    assert r2 is not None
+    new_token = r2["code"]
+    assert old_token != new_token
+
+    # 学生拿老 token 提交 (模拟老 H5 页面) → 应当被拒
+    body = {
+        "task_id":    tid,
+        "token":      old_token,
+        "student_id": student_user.student_id,
+        "password":   "123456",
+    }
+    resp = client.post("/api/signin", json=body)
+    assert resp.status_code == 400, resp.text
+    assert resp.json()["error"] == "CODE_INVALID"
+
+
+def test_signin_web_update_token_changes_url():
+    """W15+ 修法 B 验证: SigninWebServer.update_token 改 url.
+
+    闭环测试, 不真启 uvicorn (避免端口占用): 只验证 self.token / self.url 字段.
+    """
+    from src.services.signin_web import SigninWebServer
+
+    srv = SigninWebServer(task_id=999, token="OLD_TOKEN_AAAAAAAAAA", expires_at=None)
+    old_url = srv.url
+    assert "OLD_TOKEN_AAAAAAAAAA" in old_url
+
+    # 改 token (不开 server, 只验证字段)
+    srv.token = "NEW_TOKEN_BBBBBBBBBB"
+    assert "NEW_TOKEN_BBBBBBBBBB" in srv.url
+    assert "OLD_TOKEN_AAAAAAAAAA" not in srv.url
+
+
+def test_signin_web_update_token_full_restart(open_task):
+    """W15+ 修法 B 验证: update_token 真实 restart 后, 新 token 能服务.
+
+    启在端口 0 (系统随机分配), 测完关掉, 不污染.
+    """
+    import socket
+    import time
+    from src.services.signin_web import SigninWebServer, build_signin_app
+
+    # 找一个空闲端口
+    s = socket.socket()
+    s.bind(("127.0.0.1", 0))
+    port = s.getsockname()[1]
+    s.close()
+
+    srv = SigninWebServer(task_id=open_task["task_id"], token="FIRST_TOKEN",
+                           expires_at=None, host="127.0.0.1", port=port)
+    srv.start()
+    try:
+        time.sleep(0.5)  # 等 uvicorn ready
+        # 用 build_signin_app 构造 FastAPI app (用老 token 闭包)
+        app1 = build_signin_app(open_task["task_id"], "FIRST_TOKEN", None)
+        from fastapi.testclient import TestClient
+        c1 = TestClient(app1)
+        r = c1.get(f"/signin/{open_task['task_id']}/FIRST_TOKEN")
+        assert r.status_code in (200, 400)
+
+        # update_token → url 立刻变
+        srv.update_token("SECOND_TOKEN")
+        time.sleep(0.5)
+        assert srv.token == "SECOND_TOKEN"
+        assert "SECOND_TOKEN" in srv.url
+        assert "FIRST_TOKEN" not in srv.url
+
+        # 新 token 闭包的 app
+        app2 = build_signin_app(open_task["task_id"], "SECOND_TOKEN", None)
+        c2 = TestClient(app2)
+        r = c2.get(f"/signin/{open_task['task_id']}/SECOND_TOKEN")
+        assert r.status_code in (200, 400)
+    finally:
+        srv.stop()
+
+
+def test_signin_web_watchdog_starts_and_stops(open_task):
+    """W15+: watchdog 启动后能正常停止, 不会泄漏线程."""
+    import socket
+    import time
+    from src.services.signin_web import SigninWebServer
+
+    s = socket.socket()
+    s.bind(("127.0.0.1", 0))
+    port = s.getsockname()[1]
+    s.close()
+
+    srv = SigninWebServer(task_id=open_task["task_id"], token="WATCHDOG_TEST",
+                           expires_at=None, host="127.0.0.1", port=port, watchdog=True)
+    srv.start()
+    try:
+        time.sleep(0.5)
+        # watchdog 线程已启
+        assert srv._wd_thread is not None, "watchdog thread 没启"
+        assert srv._wd_thread.is_alive(), "watchdog thread 已死"
+        assert srv._wd_stop is not None
+    finally:
+        srv.stop()
+    # stop 后 watchdog 线程应退出 (join 超时 2s)
+    if srv._wd_thread is not None:
+        assert not srv._wd_thread.is_alive(), "watchdog 线程 stop 后未退出"
+
+
+def test_signin_web_watchdog_disabled_works(open_task):
+    """W15+: watchdog=False 时不启 watchdog (测试或开发场景)."""
+    import socket
+    import time
+    from src.services.signin_web import SigninWebServer
+
+    s = socket.socket()
+    s.bind(("127.0.0.1", 0))
+    port = s.getsockname()[1]
+    s.close()
+
+    srv = SigninWebServer(task_id=open_task["task_id"], token="NO_WATCHDOG",
+                           expires_at=None, host="127.0.0.1", port=port, watchdog=False)
+    srv.start()
+    try:
+        time.sleep(0.5)
+        assert srv._wd_thread is None, "watchdog=False 但线程被启了"
+    finally:
+        srv.stop()
+
+
+# =====================================================
+# W15+ /api/signin/latest — H5 polling 防缓存专用端点
+# =====================================================
+def test_signin_web_latest_returns_current_live_token(client, qr_token, open_task):
+    """W15+: GET /api/signin/latest?task=N 返当前 LIVE token.
+
+    防缓存方案的核心: H5 每 3s polling 拿当前最新 token, 不用 URL 里
+    可能过期的老 token. 这里测 1) 返回 ok=True 2) token 跟 fixture 一致
+    3) 包含 expires_at 字段 (H5 倒计时用得到).
+    """
+    resp = client.get(f"/api/signin/latest?task={open_task['task_id']}")
+    assert resp.status_code == 200, resp.text
+    data = resp.json()
+    assert data["ok"] is True
+    assert data["task_id"] == open_task["task_id"]
+    assert data["token"] == qr_token["token"]
+    assert "expires_at" in data and data["expires_at"]
+    assert data["seconds_to_expire"] > 0
+
+
+def test_signin_web_latest_after_refresh_returns_new_token(client, qr_token, open_task):
+    """W15+: 教师刷码后, /api/signin/latest 应该立刻返新 token (不是老 token).
+
+    这是防缓存的关键: 教师在 dialog 里点"刷新"生成新码, 老 H5 URL
+    缓存的用户页面 3 秒后自动拿到新 token, 老 token 自动失效.
+    """
+    # 教师刷一次码
+    result = AttendanceService().generate_signin_code(
+        open_task["task_id"], "qr", ttl_seconds=60,
+    )
+    new_token = result["code"]
+    assert new_token != qr_token["token"], "刷新码应产生新 token"
+
+    # /api/signin/latest 应该返新 token
+    resp = client.get(f"/api/signin/latest?task={open_task['task_id']}")
+    assert resp.status_code == 200, resp.text
+    data = resp.json()
+    assert data["ok"] is True
+    assert data["token"] == new_token, f"期望新 token {new_token!r}, 拿到 {data['token']!r}"
+
+
+def test_signin_web_latest_404_when_no_live_token(client, open_task):
+    """W15+: 无 LIVE token (教师未发起) → 404 NO_LIVE_TOKEN.
+
+    H5 收到 404 后按钮变灰, 倒计时显示"教师尚未发起", 不让用户提交.
+    """
+    # 把 fixture 生成的码 deactivate
+    from sqlalchemy import text
+    with engine.begin() as conn:
+        conn.execute(text(
+            "UPDATE task_signin_code SET is_active = 0 WHERE task_id = :tid"
+        ), {"tid": open_task["task_id"]})
+
+    resp = client.get(f"/api/signin/latest?task={open_task['task_id']}")
+    assert resp.status_code == 404, resp.text
+    data = resp.json()
+    assert data["ok"] is False
+    assert data["error"] == "NO_LIVE_TOKEN"

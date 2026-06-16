@@ -6,7 +6,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <title>签到 - 智能考勤系统</title>
   <style>
-    /* 移动端卡片式 H5 签到页 (W14 新增)
+    /* 移动端卡片式 H5 签到页 (W14 新增, W15+ 强化 + polling 防缓存)
        - 蓝白主题, 与 src/ui/styles.py 的 COLOR_PRIMARY/COLOR_BG 对齐
        - 不用任何外部 CSS/JS 依赖 (H5 单页, 离线 + 局域网加载也稳)
     */
@@ -30,10 +30,22 @@
       font-weight: 700; letter-spacing: 0.3px;
     }
     .sub {
-      color: #64748B; font-size: 13px; margin-bottom: 18px;
+      color: #64748B; font-size: 13px; margin-bottom: 12px;
       line-height: 1.5;
     }
     .sub b { color: #1E40AF; font-weight: 600; }
+    /* W15+ 倒计时条 */
+    .countdown {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 8px 12px; margin: 0 0 16px;
+      background: #F1F5F9; border-radius: 8px;
+      font-size: 13px; color: #475569;
+      transition: background 0.2s;
+    }
+    .countdown.warn { background: #FEF3C7; color: #92400E; }
+    .countdown.expired { background: #FEE2E2; color: #991B1B; }
+    .countdown.refreshing { background: #DBEAFE; color: #1E40AF; }
+    .countdown .time { font-weight: 700; font-family: "SF Mono", Consolas, monospace; font-size: 15px; }
     label {
       display: block; font-size: 13px; color: #475569;
       margin-bottom: 6px; font-weight: 500;
@@ -46,6 +58,7 @@
       transition: border-color 0.15s, background 0.15s;
     }
     input:focus { border-color: #2563EB; background: #FFFFFF; }
+    input:disabled { background: #F1F5F9; color: #94A3B8; cursor: not-allowed; }
     button {
       width: 100%; padding: 14px; background: #2563EB; color: white;
       border: 0; border-radius: 10px;
@@ -71,8 +84,15 @@
   <div class="card">
     <h1>📚 智能考勤签到</h1>
     <div class="sub">
-      任务 #<b>{{ task_id }}</b> — 请输入学号和密码完成签到
+      任务 #<b id="task_id_text">{{ task_id }}</b> — 请输入学号和密码完成签到
     </div>
+
+    <!-- W15+ 实时倒计时条 + 自动 polling token -->
+    <div id="countdown" class="countdown refreshing">
+      <span>⏱ 码剩余有效期</span>
+      <span class="time" id="time_text">同步中...</span>
+    </div>
+
     <form id="f" autocomplete="on">
       <label for="student_id">学号 / 用户名</label>
       <input id="student_id" name="student_id" placeholder="例如 2021001"
@@ -89,25 +109,120 @@
   </div>
 
   <script>
-    // W14 H5: 从 server 渲染时注入的 task_id / token, 提交时回传
+    /* W15+ 防 token 缓存: H5 加载时立即 polling 最新 token, 每 3 秒再 polling 一次,
+       始终用最新 token 提交. 即使教师中途刷新了码 (老 URL 缓存也不会失效),
+       学生手机 H5 自动跟上.
+
+       关键改动:
+       - taskId 从 URL 路径提取 (不是从后端注入)
+       - token 不再用 URL 里的老 token, 而是 polling /api/signin/latest?task=N 拿当前最新
+       - 提交时用当前内存里的最新 token (currentToken)
+       - 倒计时显示当前最新 token 的 expires_at
+    */
     (function () {
       var f = document.getElementById('f');
       var result = document.getElementById('result');
       var btn = document.getElementById('submit_btn');
-      var taskId = {{ task_id }};
-      var token = {{ token | tojson }};
+      var cdBox = document.getElementById('countdown');
+      var cdText = document.getElementById('time_text');
+      var taskIdText = document.getElementById('task_id_text');
 
+      // 从 URL 路径提取 taskId: /signin/{tid}/{tok}
+      // (W15+: 模板已渲染 {{ task_id }} 进 HTML 顶部, 这里仍然从 URL 二次校验,
+      //  防 HTML 缓存把任务号固化成老值)
+      var pathParts = location.pathname.split('/');
+      var taskId = parseInt(pathParts[pathParts.length - 2], 10);
+      // 不再覆盖 taskIdText.textContent — 保留后端渲染的 task_id
+
+      // 当前最新 token (polling 更新), 初始 null 表示还没拿到
+      var currentToken = null;
+      var expiresAt = null;  // Date 对象 (W15+: 当前最新 token 的过期时间, polling 更新)
+      var cdWarnSec = 30;
+      var cdExpired = false;
+      var tokenRefreshTimer = null;
+
+      function fmt(secs) {
+        if (secs <= 0) return '已过期';
+        var m = Math.floor(secs / 60);
+        var s = secs % 60;
+        return m + ':' + (s < 10 ? '0' : '') + s;
+      }
+      function tickCountdown() {
+        if (!expiresAt) {
+          cdText.textContent = '--:--';
+          return;
+        }
+        var secs = Math.max(0, Math.floor((expiresAt.getTime() - Date.now()) / 1000));
+        cdText.textContent = fmt(secs);
+        var cls = 'countdown';
+        if (secs === 0) cls += ' expired';
+        else if (secs <= cdWarnSec) cls += ' warn';
+        // 同步中 (没 token) 用 refreshing 类 (蓝色)
+        if (!currentToken) cls += ' refreshing';
+        cdBox.className = cls;
+        if (secs === 0 && !cdExpired) {
+          cdExpired = true;
+          btn.disabled = true;
+          btn.textContent = '码已过期';
+          // 不立即弹错误, 等下一次 polling 拿到新 token 再亮起按钮
+        }
+      }
+      setInterval(tickCountdown, 1000);
+
+      // W15+: polling 拿当前 task 最新 LIVE token
+      function pollLatestToken() {
+        return fetch('/api/signin/latest?task=' + taskId)
+          .then(function (r) { return r.json(); })
+          .then(function (data) {
+            if (data && data.ok) {
+              // 拿到新 token, 更新状态
+              currentToken = data.token;
+              expiresAt = new Date(data.expires_at);
+              cdExpired = false;
+              // 启用按钮 (如果之前因为过期被禁)
+              if (!btn.disabled || btn.textContent === '码已过期') {
+                btn.disabled = false;
+                btn.textContent = '立即签到';
+              }
+              // 短暂显示"已同步"提示
+              cdBox.className = 'countdown';
+              setTimeout(tickCountdown, 0);
+            } else {
+              // 无 LIVE token (教师尚未发起 或 已关闭)
+              currentToken = null;
+              expiresAt = null;
+              btn.disabled = true;
+              btn.textContent = '码不可用';
+              cdText.textContent = '教师尚未发起';
+              cdBox.className = 'countdown expired';
+            }
+          })
+          .catch(function () {
+            // 网络错, 保留当前 token 不动, 等下次 polling
+            cdBox.className = 'countdown refreshing';
+            cdText.textContent = '同步中...';
+          });
+      }
+      // 立即拉一次 + 每 3 秒轮询
+      pollLatestToken();
+      tokenRefreshTimer = setInterval(pollLatestToken, 3000);
+      tickCountdown();
+
+      // W15+: 结果展示 - 失败保留输入, 区分错误码给不同提示
       function showResult(ok, html, allowRetry) {
         result.className = 'result ' + (ok ? 'ok' : 'err');
         result.innerHTML = html;
-        if (allowRetry) {
+        if (allowRetry && !cdExpired && currentToken) {
           btn.disabled = false;
-          btn.textContent = '立即签到';
+          btn.textContent = '重新签到';
+          // 不清空输入 — 用户输的学号密码保留, 改了再点
         }
       }
 
+      // W15+: 提交用 currentToken (polling 拿到的最新 token), 不是 URL 里的
       f.addEventListener('submit', async function (e) {
         e.preventDefault();
+        if (cdExpired || !currentToken) return;  // 防御性: token 失效就别提交
         btn.disabled = true;
         btn.textContent = '签到中…';
         result.className = 'result';
@@ -116,7 +231,7 @@
         var fd = new FormData(f);
         var payload = {
           task_id:    taskId,
-          token:      token,
+          token:      currentToken,  // ← W15+: 用 polling 的最新 token, 不是 URL 老 token
           student_id: (fd.get('student_id') || '').trim(),
           password:   fd.get('password') || ''
         };
@@ -138,14 +253,26 @@
             showResult(true,
               '✓ ' + (data.student_name || '已签到') + ' ' + status + '成功<br>' +
               '<span style="font-size:12px;color:#15803D;">' + t + '</span>',
-              false /* 不允许重试, 已经成功 */
+              false
             );
           } else {
-            // 错误码 → 友好文案
+            // W15+: 区分错误码
             var msg = data.msg || '签到失败';
             var hint = '';
-            if (data.error === 'ALREADY_SIGNED') hint = '<br><span style="font-size:12px;">无需重复提交</span>';
-            else if (data.error === 'CODE_INVALID') hint = '<br><span style="font-size:12px;">请重新扫描教师屏幕</span>';
+            if (data.error === 'ALREADY_SIGNED') {
+              hint = '<br><span style="font-size:12px;">无需重复提交</span>';
+            } else if (data.error === 'CODE_INVALID') {
+              // 可能 token 刚被刷新, 下次 polling 会拿到新的, 提示重试
+              hint = '<br><span style="font-size:12px;">码可能已刷新, 重新提交即可</span>';
+              // 立即拉一次新 token
+              pollLatestToken();
+            } else if (data.error === 'TASK_CLOSED') {
+              hint = '<br><span style="font-size:12px;">该签到任务已结束</span>';
+            } else if (data.error === 'AUTH_FAILED') {
+              hint = '<br><span style="font-size:12px;">请检查学号或密码后重试</span>';
+            } else if (data.error === 'ACCOUNT_LOCKED') {
+              hint = '<br><span style="font-size:12px;">账号被锁定, 请联系教师</span>';
+            }
             showResult(false, '✗ ' + msg + hint, true);
           }
         } catch (err) {

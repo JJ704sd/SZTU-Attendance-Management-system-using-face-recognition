@@ -27,9 +27,9 @@ class LoginWindow(QWidget):
 
     def _init_ui(self):
         self.setWindowTitle("智能考勤与实验室准入系统 — 登录")
-        # W14 现代化: 窗口尺寸加大 + 最小宽度上调
-        self.resize(460, 540)
-        self.setMinimumWidth(420)
+        # W14+ 演示模式: 窗口 +60x80, 容纳更大表单字号
+        self.resize(520, 620)
+        self.setMinimumWidth(480)
 
         # —— 品牌头部 ——
         header = QWidget()

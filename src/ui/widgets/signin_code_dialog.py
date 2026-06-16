@@ -55,9 +55,11 @@ log = logging.getLogger(__name__)
 # 倒计时刷新周期（毫秒）
 TICK_INTERVAL_MS = 1000
 
-# TTL 与「红色警告」阈值（与 service 一致：DEFAULT_CODE_TTL_SECONDS=60）
-DEFAULT_TTL_SECONDS = 60
-URGENT_THRESHOLD_SECONDS = 5  # 剩余时间 < 此值时刷新按钮变橙
+# TTL 与「红色警告」阈值
+# W15+ 调整: 60s → 300s (5 分钟). 学生扫码 + 输学号密码常超过 60s, 体验差.
+#   进度条最大值 = DEFAULT_TTL_SECONDS, 红色警告阈值相应调大.
+DEFAULT_TTL_SECONDS = 300
+URGENT_THRESHOLD_SECONDS = 30  # 剩余时间 < 此值时刷新按钮变橙 (5 分钟下, 1 分钟就该刷了)
 
 # 样式
 _STYLE_BTN_DEFAULT = ""  # 走系统默认
@@ -107,13 +109,13 @@ class SigninCodeDialog(QDialog):
         )
         self.setWindowTitle(f"{self._title_text} — 任务 #{task_id}")
         self.setModal(True)
-        # W14: qr + web_server 时窗口更高以容纳「实时签到列表」
+        # W14+ 演示模式: 各模式窗口 +80~100 宽度/+100 高度, 容纳更大二维码和列表
         if code_type == "digit":
-            self.resize(360, 280)
+            self.resize(440, 380)
         elif self.web_server is not None:
-            self.resize(420, 620)  # 加高 140px 放列表
+            self.resize(480, 700)  # 加高 160px 放列表 + 大字号
         else:
-            self.resize(360, 480)
+            self.resize(440, 580)
 
         self._init_ui()
 
@@ -259,6 +261,19 @@ class SigninCodeDialog(QDialog):
         self._expires_at = result["expires_at"]
         self._render_code()
 
+        # W15+ 修复: dialog 内 _generate_code() 后必须同步 web_server.token,
+        # 否则:
+        #   - teacher_window._on_open_signin_dialog 已经 generate + 启 web_server
+        #   - dialog 启动时 (__init__ 末尾) 又 _generate_code 一次, DB 旧 token deactive
+        #   - web_server 内存 token 跟 DB LIVE 不一致 → 二维码 URL 错误
+        #   - 学生扫到错 URL → 提交 CODE_INVALID
+        # 同步后, web_server.url = 新 token URL, 二维码内容正确.
+        if self.web_server is not None and self._code_value:
+            try:
+                self.web_server.update_token(self._code_value)
+            except Exception as e:
+                log.exception("dialog 启动时 web_server.update_token 失败: %s", e)
+
         # 第一次渲染完立刻更新一次倒计时（避免开弹窗那一秒进度条还显示 60）
         self._update_countdown()
 
@@ -377,7 +392,8 @@ class SigninCodeDialog(QDialog):
                 display_value = self._code_value
             try:
                 import qrcode  # 局部 import：仅二维码路径才用
-                qr_img = qrcode.make(display_value).resize((250, 250))
+                # W14+ 演示模式: 二维码 250→280, 投影清晰
+                qr_img = qrcode.make(display_value).resize((280, 280))
                 buf = io.BytesIO()
                 # 必须先转 RGB 再存 PNG：qrcode 默认是 mode='1'，PIL PNG encoder 对
                 # 1-bit 也能写，但 'RGB' 更通用（避免某些 PIL 版本对 '1' 模式的
@@ -437,8 +453,21 @@ class SigninCodeDialog(QDialog):
     # 用户操作
     # -----------------------------------------------------
     def _on_refresh(self):
-        """教师点 🔄 重新生成码（覆盖旧码）。"""
+        """教师点 🔄 重新生成码（覆盖旧码）。
+        
+        W15+ 修复: 同步调 web_server.update_token(), 否则:
+          - _generate_code 只更新 self._code_value
+          - web_server.token 仍是旧值, self.web_server.url 不变
+          - _render_code 用 web_server.url 渲染的二维码图片内容不变
+          → 学生扫码还是老 URL, 刷新无效
+        """
         self._generate_code()
+        # W15+: 同步 web_server.token (二码码内容立刻跟刷新走)
+        if self.web_server is not None and self._code_value:
+            try:
+                self.web_server.update_token(self._code_value)
+            except Exception as e:
+                log.exception("web_server.update_token 失败, 二维码可能仍是旧 URL: %s", e)
 
     # -----------------------------------------------------
     # 销毁

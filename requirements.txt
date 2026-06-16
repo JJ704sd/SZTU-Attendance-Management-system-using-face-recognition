@@ -34,3 +34,9 @@ fastapi==0.115.0
 uvicorn[standard]==0.32.0
 jinja2==3.1.4
 httpx==0.27.2
+
+# --- W13+: 二维码签到 (教师端生成二维码图片, 学生扫码进 H5) ---
+# qrcode 8.x 是 pre-Python 3.13 wheel 全的最后一个分支; [pil] extra 拉 Pillow 作为后端
+# (build.spec hiddenimports 已经显式列 qrcode / qrcode.image.pil / qrcode.image.pure
+#  / qrcode.image.base / qrcode.compat.etree / qrcode.constants, 这里必须装否则开发环境 import 失败)
+qrcode[pil]==8.2

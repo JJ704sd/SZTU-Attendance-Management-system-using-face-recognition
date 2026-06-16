@@ -34,9 +34,9 @@ class RegisterWindow(QWidget):
 
     def _init_ui(self):
         self.setWindowTitle("注册新账号 — 智能考勤与实验室准入系统")
-        # W14 现代化: 窗口宽度 +40 / 高度 +60 容纳 9 个字段不挤
-        self.resize(520, 660)
-        self.setMinimumWidth(480)
+        # W14+ 演示模式: 窗口 +60x80, 容纳 9 个字段 + 大字号不挤
+        self.resize(580, 740)
+        self.setMinimumWidth(540)
 
         # —— 品牌头部（与登录窗同款）——
         header = QWidget()
