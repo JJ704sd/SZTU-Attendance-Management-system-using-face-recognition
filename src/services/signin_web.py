@@ -76,8 +76,7 @@ def _lookup_user(student_id_or_username: str) -> tuple[Optional[object], str]:
 def _query_task_meta(task_id: int) -> dict:
     """查任务的 course_name + teacher_name (H5 顶部展示)."""
     with session_scope() as s:
-        from src.models.classroom import Classroom
-        from src.models.course import Course
+        from src.models.course import Classroom, Course
         from src.models.user import User
         task = s.get(AttendanceTask, task_id)
         if not task:
