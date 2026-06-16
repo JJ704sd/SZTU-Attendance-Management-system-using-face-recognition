@@ -73,6 +73,7 @@ src/
 | **SQLAlchemy 2.0 ORM** | 防 SQL 注入 + 跨数据库可移植（演示可一键切 SQLite） |
 | **PyQt5 而非 Tkinter** | 控件丰富，4 个主窗口有大量表格 + 表单 |
 | **face encoding 统一 float32** | `face_helper.face_encodings` 返回 `np.float32`，与 dlib 内部 + `FaceEncoding.encoding` 列注释一致；W3 序列化/比对链路不会再因量纲不一致出错。**不要改回 float64**，有 `test_face_encodings_dtype_is_float32` 锁住 |
+| **`src/ui/styles.py` 是跨层依赖** | `src/utils/charts.py` 用 `from src.ui.styles import (COLOR_BG, COLOR_BUTTON, COLOR_DANGER, COLOR_PRIMARY, COLOR_SUCCESS, COLOR_WARNING, FONT_FAMILY)` 同步 matplotlib 主题色。重写 styles.py 时**只改 COLOR_* 值不删名**；入口函数签名 `apply_global_style / apply_auth_style / welcome_suffix` 也保持不变。W14 引入 design tokens (`RADIUS_*` / `SHADOW_*` / `FONT_SIZE_*` / `SPACING_*`) 时同样**只增常量不删旧的** |
 
 ## 环境陷阱（容易踩的）
 

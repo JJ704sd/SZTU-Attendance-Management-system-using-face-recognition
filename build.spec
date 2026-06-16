@@ -24,6 +24,14 @@ hiddenimports = [
     # matplotlib PyQt5 backend
     'matplotlib.backends.backend_qt5agg',
     'matplotlib.backends.backend_qt5',
+    # W13+ 二维码签到 (PyInstaller 静态分析扫不到 qrcode.image.pil)
+    # W14 修复: 不加会导致 dist/_internal 缺 qrcode 目录，运行时 import qrcode 报 ModuleNotFoundError
+    'qrcode',
+    'qrcode.image.pil',
+    'qrcode.image.pure',
+    'qrcode.image.base',
+    'qrcode.compat.etree',
+    'qrcode.constants',
     # 项目内 module 兜底（防 dynamic import 漏掉）
     'src.services.face_service',
     'src.services.lab_access_service',
@@ -39,7 +47,7 @@ hiddenimports = [
     'src.dao.lab_access_log_dao',
     'src.dao.course_enrollment_dao',
     'src.dao.login_attempt_dao',
-]
+] 
 
 # 2. datas = 额外要带进 exe 的资源
 # 暂时不打包：dlib 模型（运行时下载，.env（含密码），dataset/（用户运行时生成）
