@@ -21,6 +21,10 @@ python -m src.main
 # 等价启动方式
 bash scripts/run_dev.sh        # Linux/macOS
 scripts\run_dev.bat            # Windows
+
+# W14: 多端登录签到烟测
+python scripts/smoke_signin_web.py
+python scripts/smoke_signin_web_build.py
 ```
 
 ### 测试
@@ -74,6 +78,8 @@ src/
 | **PyQt5 而非 Tkinter** | 控件丰富，4 个主窗口有大量表格 + 表单 |
 | **face encoding 统一 float32** | `face_helper.face_encodings` 返回 `np.float32`，与 dlib 内部 + `FaceEncoding.encoding` 列注释一致；W3 序列化/比对链路不会再因量纲不一致出错。**不要改回 float64**，有 `test_face_encodings_dtype_is_float32` 锁住 |
 | **`src/ui/styles.py` 是跨层依赖** | `src/utils/charts.py` 用 `from src.ui.styles import (COLOR_BG, COLOR_BUTTON, COLOR_DANGER, COLOR_PRIMARY, COLOR_SUCCESS, COLOR_WARNING, FONT_FAMILY)` 同步 matplotlib 主题色。重写 styles.py 时**只改 COLOR_* 值不删名**；入口函数签名 `apply_global_style / apply_auth_style / welcome_suffix` 也保持不变。W14 引入 design tokens (`RADIUS_*` / `SHADOW_*` / `FONT_SIZE_*` / `SPACING_*`) 时同样**只增常量不删旧的** |
+| **FastAPI 嵌入到 PyQt 进程（不独立跑）** | W14 多端登录签到需要 HTTP 服务，但项目本身是桌面应用；独立跑 uvicorn 进程需要管端口/启停/与 GUI 生命周期对齐，体验割裂。改为 `uvicorn.Server` 在 `threading.Thread(daemon=True)` 里跑，`closeEvent` 调 `srv.should_exit = True` 同步停。SigninCodeDialog show → start，close → stop，单进程统一 |
+| **W14 二维码签到内容 = URL（不是裸 token）** | 教师电脑起 :5180 FastAPI + H5 签到页，学生手机扫码后浏览器打开 `http://<lan_ip>:5180/signin/<task>/<token>`；二维码内容是完整 URL（带 host+port+path+token），手机浏览器直接渲染表单。`src/utils/network.get_lan_ip()` 自动探本机局域网 IP；端口冲突自动 +1 重试 1 次（`src/services/signin_web.py::SigninWebServer.start`） |
 
 ## 环境陷阱（容易踩的）
 
@@ -97,8 +103,8 @@ src/
 | `docs/` | 设计文档（PROJECT_PLAN / ARCHITECTURE / STRUCTURE / DEVELOPMENT / DATABASE / WORKFLOWS / TEAM_AND_TIMELINE） |
 | `docs/SIGNIN_METHODS.md` | W13+ 签到方式完整文档（刷脸/数字码/二维码对比 + 操作手册） |
 | `docs/superpowers/plans/` | 实施计划（按 writing-plans skill 格式）。当前最新：`2026-06-07-W12-p0-fixes-and-deliverables.md`（W12 P0 验收修复 + W13+ 课程交付计划，截止2026-06-20） |
-| `tests/` | 单元测试（**103/103** 全过，~40s 0 warning；含 1 项 dtype 回归 + 1 项 collect_for_user 死循环回归 + W12 新增 18 项 camera/admin_tab 覆盖 + W13+ 新增 18 项 signin_methods） |
-| `scripts/` | 运维 + 烟测脚本（init_db / run_dev / seed_demo_data / cleanup_test_users / smoke_full_flow / smoke_real_face / smoke_ui_qtest / smoke_e2e / **smoke_signin_methods** / **smoke_audit_history**） |
+| `tests/` | 单元测试（**179/179** 全过，~55s 4 warning；含 1 项 dtype 回归 + 1 项 collect_for_user 死循环回归 + W12 新增 18 项 camera/admin_tab 覆盖 + W13+ 新增 18 项 signin_methods + W14 新增 11 项 signin_web + 10 项 UI 现代化 + 5 项 task_signin_code_dao） |
+| `scripts/` | 运维 + 烟测脚本（init_db / run_dev / seed_demo_data / cleanup_test_users / smoke_full_flow / smoke_real_face / smoke_ui_qtest / smoke_e2e / **smoke_signin_methods** / **smoke_audit_history** / **smoke_qrcode_build** / **smoke_signin_web** / **smoke_signin_web_build**） |
 | `dist/` `build/` | PyInstaller onedir打包产物（git ignore，不入库） |
 | `models/` | dlib 模型权重（git ignore，运行时下载） |
 | `dataset/` | 人脸采集图片（git ignore，运行时生成） |
@@ -114,7 +120,7 @@ src/
 
 ## 当前进度
 
-**W13+ 已合：数字码 + 二维码签到全链路通；课程交付物（报告 / PPT /演示视频 / .zip）尚未做，截止2026-06-20。**
+**W14 已合：FastAPI 嵌入 + H5 签到页 + 多端登录（手机扫码 → 浏览器 → 教师端实时反馈）；课程交付物（报告 / PPT / 演示视频 / .zip）待收尾，截止2026-06-20。**
 
 完整 12 周迭代 (W2 → W13+)：
 
@@ -130,10 +136,11 @@ src/
 - ✅ **W11**：int/float/env 转换 + 20 领域系统扫
 - ✅ **W12**：P0 验收修复 12 真 bug + 2 业务功能（管理员人脸管理 + 学生清自己人脸）
 - ✅ **W13+**：教师/学生端数字码 + 二维码签到（对分易式手动触发码）+ 13 张表 + 5 个 smoke
-- ✅ 测试：**103/103** 全过，~40s 0 warning；含 1 项 dtype 回归 + 1 项 collect_for_user 死循环回归 + W12 新增 18 项 + W13+ 新增 18 项
-- ✅ Smoke：5 个脚本（full_flow / real_face / ui_qtest / e2e / signin_methods）+ audit_history 16/16 OK
+- ✅ **W14**：FastAPI 嵌入 + H5 签到页 + 多端登录（手机扫码 → 浏览器 → 教师端实时反馈）
+- ✅ 测试：**179/179** 全过（含 1 项 dtype 回归 + 1 项 collect_for_user 死循环回归 + W12 新增 18 项 + W13+ 新增 18 项 + W14 新增 11 项 signin_web + 10 项 UI 现代化 + 5 项 task_signin_code_dao）
+- ✅ Smoke：5 个脚本（full_flow / real_face / ui_qtest / e2e / signin_methods）+ audit_history 16/16 OK + smoke_qrcode_build + smoke_signin_web (9 步全链路) + smoke_signin_web_build
 - ✅ GitHub：**53 commit** 已推 main
-- 📋 下一步：课程交付物（报告 PDF / 答辩 PPT / 演示视频 / 提交物 .zip），详 `docs/superpowers/plans/2026-06-07-W12-p0-fixes-and-deliverables.md`
+- 📋 下一步：课程交付物（报告 PDF / 答辩 PPT / 演示视频 / 提交物 .zip），详 `docs/superpowers/plans/2026-06-07-W12-p0-fixes-and-deliverables.md` + `docs/W14-defense-outline.md`
 
 ## W3 Phase 5 学生端接入时必踩的坑
 
