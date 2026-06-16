@@ -86,6 +86,10 @@ class StudentWindow(QWidget):
         # 内部锁: _on_sub_signin_succeeded 调 _refresh_open_tasks 时置位, 防止
         # _on_task_changed 误把 banner / subtabs 灰显状态清掉.
         self._signed_in_lock: bool = False
+        # W14: 刷脸提示去重 —— 500ms tick 反复触发陌生人脸/他人脸时,
+        # 只在文案变化时刷新状态栏, 让 warning 视觉态保持可见
+        # (不清掉之前的提示, 让用户能稳定看到 "请对准摄像头本人" 之类).
+        self._last_face_status: Optional[str] = None
 
         self._init_ui()
 
@@ -507,6 +511,8 @@ class StudentWindow(QWidget):
         self._current_task_id = task_id
         self._signing_in = True
         self._signin_timer.start()
+        # W14: 重置刷脸提示去重状态, 新一轮签到开始时把上一轮的 warning 清掉
+        self._last_face_status = None
         self._set_label_state(self.signin_status,
                               f"签到中...请正对摄像头（任务 #{task_id}）", "neutral")
         self.start_signin_btn.setEnabled(False)
@@ -520,7 +526,17 @@ class StudentWindow(QWidget):
         self.stop_signin_btn.setEnabled(False)
 
     def _on_signin_tick(self):
-        """500ms 一次：抓帧 → face_encodings → recognize → 命中就签到。"""
+        """500ms 一次：抓帧 → face_encodings → recognize → 命中就签到。
+
+        W14 改造:
+        - 陌生人脸 (recognize 返回 None): 静默改为 warning 提示
+          "未识别到人脸，请对准摄像头本人"
+        - 识别到他人 (user_id != self.user.id): 中性提示改为 warning
+          "检测到其他用户，非本人签到无效。请本人面对摄像头",
+          不再泄露内部 user_id
+        - 用 self._last_face_status 去重: 同一文案不重复 setText/polish,
+          让 warning 状态稳定可见, 不被下一帧覆盖消失
+        """
         if not self._signing_in or not self.signin_camera.is_running():
             return
         frame = self.signin_camera.capture_one_frame()
@@ -546,14 +562,18 @@ class StudentWindow(QWidget):
             log.exception("recognize 异常")
             return
         if result is None:
+            # W14: 陌生人脸 → warning 提示用户调整位置/本人面对摄像头
+            self._update_face_status("未识别到人脸，请对准摄像头本人", "warning")
             return
         user_id, distance = result
         if user_id != self.user.id:
-            # 别人脸：继续识别，不签到
-            self._set_label_state(self.signin_status,
-                                  f"识别到他人（user_id={user_id}，距离={distance:.3f}），继续...", "neutral")
+            # W14: 识别到他人 → warning 提示, 不暴露内部 user_id
+            self._update_face_status(
+                "检测到其他用户，非本人签到无效。请本人面对摄像头", "warning")
             return
         # 是我 → 签到
+        # 重置去重状态, 让 _on_sub_signin_succeeded / _set_label_state(success) 正常生效
+        self._last_face_status = None
         self._on_stop_signin()
         try:
             record = self.attendance_service.sign_in_by_face(
@@ -572,6 +592,17 @@ class StudentWindow(QWidget):
                                 f"签到成功！\n状态: {record.status}\n距离: {distance:.4f}")
         # W13+: 走统一的「先到先签」灰显流程 (banner + disable subtabs + 刷新任务下拉)
         self._on_sub_signin_succeeded(record)
+
+    def _update_face_status(self, text: str, state: str):
+        """W14: 刷脸提示去重 —— 同一文案不重复调用 setProperty/polish,
+        让 warning 视觉态在 500ms tick 间稳定可见, 不被下一帧覆盖闪一下就消失.
+
+        调用方: _on_signin_tick 的陌生人脸 / 识别到他人分支.
+        """
+        if self._last_face_status == text:
+            return  # 文案没变, 不重复刷 QSS
+        self._last_face_status = text
+        self._set_label_state(self.signin_status, text, state)
 
     # ==================================================================
     # Tab 3: 我的考勤
