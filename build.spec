@@ -63,6 +63,7 @@ hiddenimports = [
     'src.services.auth_service',
     'src.services.attendance_service',
     'src.services.signin_web',          # W14: 多端登录签到
+    'src.services.leave_service',       # W6+ (跨机适配补, 远端漏列了)
     'src.utils.face_helper',
     'src.utils.charts',
     'src.utils.network',                # W14: LAN IP / 端口探测
@@ -73,7 +74,16 @@ hiddenimports = [
     'src.dao.lab_access_log_dao',
     'src.dao.course_enrollment_dao',
     'src.dao.login_attempt_dao',
-] 
+    # W14 跨机适配: 这些 dao 都是 service 函数内 lazy import, PyInstaller 静态
+    #   分析可能扫不到, 显式列上兜底 (尤其 task_signin_code_dao, W13+
+    #   数字码/二维码签到会因缺它直接 ModuleNotFoundError)
+    'src.dao.user_dao',
+    'src.dao.classroom_dao',
+    'src.dao.course_dao',
+    'src.dao.attendance_dao',
+    'src.dao.leave_request_dao',
+    'src.dao.task_signin_code_dao',
+]
 
 # 2. datas = 额外要带进 exe 的资源
 # 暂时不打包：dlib 模型（运行时下载，.env（含密码），dataset/（用户运行时生成）

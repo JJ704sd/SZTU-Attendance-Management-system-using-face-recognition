@@ -5,7 +5,8 @@ from pathlib import Path
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-PROJ = Path(r"D:\Attendance-Management-system-using-face-recognition")
+# W14 修复: 跨机适配 — 改成相对路径, 不再硬编码 D 盘
+PROJ = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJ / "src"))
 sys.path.insert(0, str(PROJ))
 

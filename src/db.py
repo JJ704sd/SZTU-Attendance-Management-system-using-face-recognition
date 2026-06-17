@@ -39,9 +39,13 @@ def init_db():
     log = logging.getLogger(__name__)
     log.info("init_db: 开始导入 models")
     # 导入所有模型，确保 Base.metadata 知道它们
+    # W14 修复: 加上 task_signin_code —— W13+ 数字码/二维码签到需要这张表
+    #   漏 import 时 Base.metadata.create_all() 不会建这张表, 首次签到报
+    #   "Table 'attendance_lab.task_signin_code' doesn't exist"
     from src.models import (
         user, face, course, attendance, lab,
-        course_enrollment, login_attempt,  # W4 Phase 1
+        course_enrollment, login_attempt,
+        task_signin_code,  # W13+
     )  # noqa
     log.info("init_db: models 导入完成, 调 create_all")
     try:

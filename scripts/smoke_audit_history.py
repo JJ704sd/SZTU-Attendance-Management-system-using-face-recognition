@@ -1,7 +1,10 @@
 """W7-W12 关键 bug 修复 smoke 校验"""
 import sys
-sys.path.insert(0, r"D:\Attendance-Management-system-using-face-recognition\src")
-sys.path.insert(0, r"D:\Attendance-Management-system-using-face-recognition")
+from pathlib import Path
+# W14 修复: 跨机适配 — 改成相对路径, 不再硬编码 D 盘
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(PROJECT_ROOT / "src"))
+sys.path.insert(0, str(PROJECT_ROOT))
 import inspect
 
 results = []
