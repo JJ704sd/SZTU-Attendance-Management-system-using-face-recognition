@@ -106,5 +106,8 @@ backups/
 # 项目根目录的 attendance-system-submission.zip 是给组员/老师的本地交付物,
 # 跟 PyInstaller onedir 产物一样不入库, 组员用 `git archive` 重新生成.
 attendance-system-submission.zip
+# group-member-package.zip 是 '只发 3 样' 给组员的最简包
+# (源码 zip + TEAM_SETUP.md + TESTING_CHECKLIST.md + README.md)
+group-member-package.zip
 *.zip
 !docs/**/*.zip
