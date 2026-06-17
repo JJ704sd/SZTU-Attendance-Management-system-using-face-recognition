@@ -7,8 +7,8 @@
 
 | 工具 | 版本 | 验证命令 | 备注 |
 |---|---|---|---|
-| **Python** | 3.11 / 3.12 / 3.13 任意一个 | `python --version` | 推荐 3.11+（dlib-bin 在三个版本都有 wheel） |
-| **MySQL** | 8.0+ | `mysql --version` | 启动 `mysqld` 服务, root 密码记住 |
+| **Python** | **3.13.6 或 3.13.9**（**必须**） | `python --version` | 项目代码用 PEP 604 `X \| None` 语法（3.10+）+ dlib-bin 20.0.1 在 3.13 验证通过；3.11/3.12 严格说能跑但 numpy 2.x + matplotlib 3.10 + PyQt5 5.15 组合未验证，可能装上但运行时炸 |
+| **MySQL** | **8.0.29+**（**必须**） | `mysql --version` | migration 用 `IF NOT EXISTS` 语法，5.7 / 8.0.28- 不支持；启动 `mysqld` 服务, root 密码记住 |
 | **Git** | 任意 | `git --version` | 拉项目用 |
 | **Webcam** | 任意 USB / 内置 | (无) | 仅"刷脸签到"需要, 数字码 / 二维码不依赖 |
 | **Visual C++ Runtime** | Win10 1903+ 自带 | (无) | dlib-bin 需要, 大多数 Win10/11 已装 |
@@ -64,9 +64,9 @@ pip install -r requirements.txt
 
 > 装完验证：
 > ```powershell
-> python -c "import PyQt5, dlib, cv2, sqlalchemy, pymysql, bcrypt, qrcode, numpy, matplotlib; print('all OK')"
+> python -c "import PyQt5, dlib, cv2, sqlalchemy, pymysql, bcrypt, qrcode, numpy, matplotlib, fastapi, uvicorn, jinja2, httpx; print('all OK')"
 > ```
-> 应输出 `all OK`。**`qrcode` 是 W14 修复加上的, 必须装**（教师端二维码签到依赖）。
+> 应输出 `all OK`。**4 个 W14+ 依赖**（fastapi / uvicorn / jinja2 / httpx）漏装会导致手机扫码 H5 签到 + H5 polling 崩。
 
 ## 3. 配 .env
 
@@ -93,42 +93,74 @@ DB_NAME=attendance_lab
 ## 4. 初始化数据库（首次必跑）
 
 ```powershell
-# W14 修复: 自动跑 schema.sql + migration_w13.sql (13 张表)
+# W14+ 修复: 自动跑 schema.sql + migration_w13.sql + migration_w14.sql (14 张表)
 python scripts\init_db.py
 ```
 
 **期望输出**：
 ```
 [INFO] 准备初始化 attendance_lab @ 127.0.0.1:3306 ...
-[INFO] 将同时跑 migration_w13.sql (W13+ 增量迁移)
+[INFO] 将同时跑 migration_w13.sql (W13+ task_signin_code)
+[INFO] 将同时跑 migration_w14.sql (W14+ course_teacher)
 [OK] schema.sql 执行完成
 [OK] migration_w13.sql 执行完成
-[OK] 数据库 attendance_lab 初始化完成 (共 2 个 SQL 脚本)
+[OK] migration_w14.sql 执行完成
+[OK] 数据库 attendance_lab 初始化完成 (共 3 个 SQL 脚本, 14 张表)
 ```
 
-> 看到 3 个 `[OK]` 就成功了。13 张表（user / face_encoding / course / classroom / laboratory / attendance_task / attendance_record / leave_request / lab_training / lab_access_log / course_enrollment / login_attempt / **task_signin_code**）都建好。
+> 看到 4 个 `[OK]` 就成功了。**14 张表**（user / face_encoding / course / classroom / laboratory / attendance_task / attendance_record / leave_request / lab_training / lab_access_log / course_enrollment / login_attempt / **task_signin_code** / **course_teacher**）都建好。
 >
 > 若失败：
 > - `[ERR] 未找到 mysql 命令` → MySQL Client 没在 PATH, 装 MySQL 时勾上"Add to PATH"或手动加
 > - `[ERR] .env 中没有 DB_PASSWORD` → 第 3 步没配 .env
 > - `Access denied` → 密码错了
 
-## 5. 启动 GUI
+## 5. 启动 GUI（首次会弹 Windows 防火墙）
 
 ```powershell
-# ⚠️ 必须在项目根目录跑, 不能 cd src
+# ⚠️ 必须在项目根目录跑
 python -m src.main
 ```
 
-**首次启动 5-10 秒**（dlib 模型 120MB 首次下载，要联网），后续启动 2 秒。
+**首次启动会自动发生**：
+1. `init_db()` 建表（已建就跳过）
+2. dlib 模型 120MB 下载（首次, 断网会失败）
+3. **Windows 防火墙弹窗**（关键！看下方说明）
+4. 预热 + 弹登录窗口
 
-**自动行为**：
-1. `init_db()` 自动建表（已建就跳过）
-2. `_FaceCache` 预热（库中没人脸 → warning 但不挂）
-3. `face_helper.ensure_models()` 验 dlib 模型路径（首次跑会下 120MB）
-4. 弹登录窗口
+### 5.1 Windows 防火墙授权（首次必点允许）
 
-**演示账号**：
+首次启动会弹 **"Windows Defender 防火墙已阻止 Python 的某些功能"**：
+
+- **专用网络** ✅ 勾上
+- **公用网络** ✅ 勾上（**组员在咖啡店/图书馆/校园 WiFi 时这是关键**）
+- 点 **"允许访问"**
+
+> **为什么要这一步**：W14 多端签到启了 `uvicorn` HTTP 服务（端口 5180），监听 `0.0.0.0`（全网卡），学生手机扫码要连进来。Windows 防火墙若不允许，**学生手机连不上，教师以为"网络问题"**。
+>
+> **如果不小心点了"取消"**：补上 →
+> ```powershell
+> # 管理员 PowerShell
+> New-NetFirewallRule -DisplayName "AttendanceSigninWeb" -Direction Inbound -LocalPort 5180 -Protocol TCP -Action Allow
+> ```
+> 然后重启 `python -m src.main`。
+
+### 5.2 启动成功标志 — `app.log` 应有
+
+```
+W5: 文件日志已启用 -> D:\...\app.log
+=== 应用启动 ===
+init_db: 开始导入 models
+init_db: models 导入完成, 调 create_all
+init_db: create_all 完成
+数据库初始化完成
+人脸编码缓存预热完成: N 个用户
+dlib 模型路径 OK: sp=shape_predictor_68_face_landmarks.dat (95MB), fr=dlib_face_recognition_resnet_model_v1.dat (21MB)
+```
+
+> 看不到 "数据库初始化完成" 或 "dlib 模型路径 OK" 那一行？见 [故障排除](#故障排除) T1 / T4。
+
+### 5.3 演示账号
 
 | 角色 | 用户名 | 密码 | 说明 |
 |---|---|---|---|
@@ -137,7 +169,7 @@ python -m src.main
 | 管理员 | `labadmin01` | `123456` | 跑 `scripts/seed_demo_data.py` 会自动建 |
 | 演示 | `teacher001` | `123456` | W4 预置, 已挂 BME201 + 2 open task |
 
-若 `test001 / teacher01` 跑不进去, 跑一次 seed：
+若 `test001 / teacher01` 跑不进去，跑一次 seed：
 
 ```powershell
 python scripts\seed_demo_data.py
@@ -146,25 +178,27 @@ python scripts\seed_demo_data.py
 ## 6. 跑测试（验证环境 OK）
 
 ```powershell
-# 全测 (136 项 / ~47s / 0 warning)
+# 全测 (188 项 / ~55s / 7 warnings — 全部是 starlette/websockets 库 deprecation, 与本项目无关)
 python -m pytest tests/ -q
 
 # 期望结尾:
-# 136 passed in ~45s
+# 188 passed in ~55s
 ```
 
 若失败先看 [故障排除](#故障排除)。
 
-**7 个 smoke 端到端脚本**（更接近真实用户行为）：
+**8 个 smoke 端到端脚本**（更接近真实用户行为）：
 
 ```powershell
-python scripts\smoke_full_flow.py         # 完整业务流 (W6)
-python scripts\smoke_real_face.py         # dlib 真脸 + 摄像头 (W6, 需要 webcam)
-python scripts\smoke_ui_qtest.py          # QTest 真实 UI (W6)
-python scripts\smoke_e2e.py               # 打包后端到端 (W5)
-python scripts\smoke_signin_methods.py    # W13+ 数字码 + 二维码签到
-python scripts\smoke_audit_history.py     # W7-W12 历史修复回归 (16/16 OK)
-python scripts\smoke_full_regression.py   # 6 service + 13 dao 全公开方法 (~30 项)
+python scripts\smoke_full_flow.py            # 完整业务流 (W6)
+python scripts\smoke_real_face.py            # dlib 真脸 + 摄像头 (W6, 需要 webcam)
+python scripts\smoke_ui_qtest.py             # QTest 真实 UI (W6)
+python scripts\smoke_e2e.py                  # 打包后端到端 (W5)
+python scripts\smoke_signin_methods.py       # W13+ 数字码 + 二维码签到
+python scripts\smoke_audit_history.py        # W7-W12 历史修复回归 (16/16 OK)
+python scripts\smoke_full_regression.py      # 6 service + 13 dao 全公开方法 (~30 项)
+python scripts\smoke_signin_web.py           # W14 H5 多端签到 (9 步)
+python scripts\smoke_signin_web_build.py     # W14 H5 打包验证
 ```
 
 ## 7. 打 exe（可选, 给老师 / 演示用）
@@ -173,7 +207,7 @@ python scripts\smoke_full_regression.py   # 6 service + 13 dao 全公开方法 (
 # 装 pyinstaller（已装在 requirements 里, 这步可跳）
 pip install pyinstaller
 
-# 打包 (~5 分钟, 产物 ~400 MB onedir 目录)
+# 打包 (~5 分钟, 产物 ~380 MB onedir 目录)
 pyinstaller build.spec
 
 # 产物: dist\attendance-system\attendance-system.exe
@@ -246,14 +280,15 @@ python -m src.main                             # 验证 GUI 起来
 ## 项目速览
 
 - **架构**：4 层 (ui → service → dao → model) + utils
-- **13 张表** (schema.sql 12 + migration_w13.sql 1)
-- **6 个 service** / **13 个 widget** / **4 个主窗口** (login / register / student / teacher / admin)
+- **14 张表** (schema.sql 12 + migration_w13.sql 1 + migration_w14.sql 1)
+- **6 个 service** / **14 个 widget** / **4 个主窗口** (login / register / student / teacher / admin)
 - **3 种签到方式**：刷脸 / 数字码 (对分易式 60s 倒计时) / 二维码 (base64 token)
-- **依赖**：PyQt5 + SQLAlchemy 2.0 + dlib-bin + opencv + bcrypt + qrcode
-- **测试**：136 单元 + 7 smoke
+- **W14 多端登录签到**：FastAPI 嵌入 + H5 签到页 (手机扫码 → 浏览器 → 教师端实时反馈)
+- **依赖**：PyQt5 + SQLAlchemy 2.0 + dlib-bin + opencv + bcrypt + qrcode + fastapi + uvicorn + jinja2 + httpx
+- **测试**：188 单元 + 8 smoke
 - **打包**：PyInstaller onedir 380 MB
 
-详细看 [README.md](../README.md) + [CLAUDE.md](../CLAUDE.md) + [docs/PACKAGING.md](PACKAGING.md) + [docs/SMOKE_TESTS.md](SMOKE_TESTS.md) + [docs/SIGNIN_METHODS.md](SIGNIN_METHODS.md)。
+详细看 [README.md](../README.md) + [CLAUDE.md](../CLAUDE.md) + [docs/PACKAGING.md](PACKAGING.md) + [docs/SMOKE_TESTS.md](SMOKE_TESTS.md) + [docs/SIGNIN_METHODS.md](SIGNIN_METHODS.md) + [docs/TESTING_CHECKLIST.md](TESTING_CHECKLIST.md)。
 
 ---
 

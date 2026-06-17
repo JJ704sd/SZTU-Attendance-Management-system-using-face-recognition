@@ -12,7 +12,16 @@ from src.utils.paths import APP_ROOT
 
 # 加载 .env（dev: 项目根；打包后: exe 同级目录）
 PROJECT_ROOT = APP_ROOT
-load_dotenv(PROJECT_ROOT / ".env")
+_env_path = PROJECT_ROOT / ".env"
+if not _env_path.exists():
+    # W15+: 静默 load 改成 log warning, main.py 启动时会再硬性校验弹窗
+    import logging
+    logging.getLogger(__name__).warning(
+        ".env 不存在: %s, DB_PASSWORD 等会用 default (空), "
+        "main.py 启动时会弹窗提示, 见 docs/TEAM_SETUP.md",
+        _env_path,
+    )
+load_dotenv(_env_path)
 
 
 class Config:

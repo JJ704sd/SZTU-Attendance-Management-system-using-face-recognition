@@ -27,6 +27,47 @@ FACE_REC_MODEL_URL = (
     "dlib_face_recognition_resnet_model_v1.dat.bz2"
 )
 
+# W15+: 国内镜像 fallback. GitHub raw 国内经常被墙/超时, 失败时自动试 gitee 镜像.
+# gitee 镜像由 community 维护, 偶尔会同步延迟; 失败时再走原始 GitHub URL.
+SHAPE_PREDICTOR_URL_GITEE = (
+    "https://gitee.com/anyxch/dlib-models-raw/raw/master/"
+    "shape_predictor_68_face_landmarks.dat.bz2"
+)
+FACE_REC_MODEL_URL_GITEE = (
+    "https://gitee.com/anyxch/dlib-models-raw/raw/master/"
+    "dlib_face_recognition_resnet_model_v1.dat.bz2"
+)
+
+
+def _download_with_fallback(urls, target, log):
+    """依次尝试 urls 列表, 第一个成功就停.
+
+    W15+: 国内组员用 GitHub raw 经常被墙/超时, fallback 到 gitee 镜像.
+    失败时保留最后一次的 .bz2 给下次重试 (跟之前一样, 不会下到一半删了重来).
+    """
+    last_err = None
+    for i, url in enumerate(urls):
+        try:
+            log.info("Downloading %s (mirror %d/%d) -> %s", url, i + 1, len(urls), target.name)
+            with urllib.request.urlopen(url, timeout=60) as resp:
+                bz2_path = target.with_suffix(target.suffix + ".bz2")
+                with open(bz2_path, "wb") as f:
+                    while True:
+                        chunk = resp.read(64 * 1024)
+                        if not chunk:
+                            break
+                        f.write(chunk)
+            return  # 成功
+        except Exception as e:
+            last_err = e
+            log.warning("镜像 %s 失败 (%s), 试下一个", url, e)
+    # 全部失败
+    raise RuntimeError(
+        f"所有镜像下载失败 (试了 {len(urls)} 个): {last_err}\n"
+        f"请检查网络; 国内组员可挂代理后重试, 或手动下载 {target.name}.bz2 "
+        f"放到 {target.parent}/ 下重跑"
+    )
+
 
 def _download_and_decompress(url: str, target: Path):
     """下载 .bz2 文件并解压到 target
@@ -35,6 +76,10 @@ def _download_and_decompress(url: str, target: Path):
     - 加 timeout (默认 60s), 避免 GitHub 慢响应时 urlretrieve 永久阻塞
     - 改用 logging 而非 print, 跟项目其它代码一致
     - 解压失败保留 bz2 文件, 避免下次重下 100MB
+
+    W15+ 修复:
+    - 改成调 _download_with_fallback(URL 列表), 失败时自动试下一个镜像
+    - 兼容外部调用 (ensure_models 仍传单个 URL 即可, 我们在内部补镜像)
     """
     import logging
     log = logging.getLogger(__name__)
@@ -43,16 +88,17 @@ def _download_and_decompress(url: str, target: Path):
     bz2_path = target.with_suffix(target.suffix + ".bz2")
     if target.exists():
         return
-    log.info("Downloading %s -> %s", url, target.name)
+
+    # W15+: 拼 fallback URL 列表 (原始 URL 优先, gitee 镜像兜底)
+    if url == SHAPE_PREDICTOR_URL:
+        urls = [SHAPE_PREDICTOR_URL, SHAPE_PREDICTOR_URL_GITEE]
+    elif url == FACE_REC_MODEL_URL:
+        urls = [FACE_REC_MODEL_URL, FACE_REC_MODEL_URL_GITEE]
+    else:
+        urls = [url]
+
     try:
-        # 用 urlopen + timeout 替代 urlretrieve (urlretrieve 不支持 timeout)
-        with urllib.request.urlopen(url, timeout=60) as resp:
-            with open(bz2_path, "wb") as f:
-                while True:
-                    chunk = resp.read(64 * 1024)
-                    if not chunk:
-                        break
-                    f.write(chunk)
+        _download_with_fallback(urls, target, log)
     except Exception as e:
         # W9: 保留 bz2 文件, 避免下次重下 100MB
         log.error("下载失败 (bz2 已保留供重试): %s", e)

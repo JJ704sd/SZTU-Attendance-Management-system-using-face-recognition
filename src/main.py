@@ -50,6 +50,30 @@ def main():
     _setup_file_logging()
     log.info("=== 应用启动 ===")
 
+    # 0. W15+ 修复: 启动时显式校验 .env + DB_PASSWORD, 缺了直接给明确提示
+    #   之前靠 init_db() 失败弹 QMessageBox 间接提示, 组员分不清是 .env 没改、
+    #   MySQL 没启、还是密码错. 现在先验 .env 存在 + DB_PASSWORD 非空.
+    from pathlib import Path
+    _env_path = Path(__file__).resolve().parent.parent / ".env"
+    if not _env_path.exists():
+        QMessageBox.critical(
+            None, "缺少 .env 配置",
+            f"找不到 .env 文件: {_env_path}\n\n"
+            f"请先复制模板:\n"
+            f"  Copy-Item .env.template .env\n"
+            f"然后编辑 .env 填 DB_PASSWORD (你的 MySQL 密码)。\n\n"
+            f"详细步骤见 docs/TEAM_SETUP.md 第 3 步。"
+        )
+        sys.exit(1)
+    if not Config.DB_PASSWORD:
+        QMessageBox.critical(
+            None, ".env 未配置",
+            f".env 存在但 DB_PASSWORD 是空字符串。\n"
+            f"请编辑 {_env_path} 把 DB_PASSWORD 改成你的 MySQL root 密码。\n\n"
+            f"详细步骤见 docs/TEAM_SETUP.md 第 3 步。"
+        )
+        sys.exit(1)
+
     # 1. 初始化数据库（建表）
     try:
         init_db()

@@ -379,32 +379,49 @@ class SigninWebServer:
         return uvicorn.Server(cfg)
 
     def start(self):
-        """启动 uvicorn 在子线程; 端口冲突自动 +1 重试 1 次."""
+        """启动 uvicorn 在子线程; 端口冲突自动 +1 重试 5 次.
+
+        W15+ 调整: 重试次数 1 → 5, 之前 1 次重试还失败就静默挂掉,
+        教师以为"网络问题"但其实是端口全被占. 现在重试 5 次 (5180-5184),
+        仍失败才放弃并 log error.
+        """
         with self._lock:
             if self._thread is not None and self._thread.is_alive():
                 log.warning("SigninWebServer 已在运行, 跳过重复 start")
                 return
             self._server = self._build_server()
             original_port = self.port
+            MAX_PORT_RETRY = 5  # W15+: 1 → 5
 
             def _runner(srv: uvicorn.Server):
-                try:
-                    srv.run()
-                except OSError as e:
-                    # uvicorn 内部 try bind 失败 → 端口冲突
-                    # 重试用 self.port + 1 (但闭包里 self.port 也得同步)
-                    self.port = original_port + 1
-                    log.warning(
-                        "端口 %s 启动失败 (%s), 重试 %s",
-                        original_port, e, self.port,
-                    )
-                    self._server = self._build_server()
+                retry = 0
+                current_srv = srv
+                while retry <= MAX_PORT_RETRY:
                     try:
-                        self._server.run()
-                    except Exception as e2:
-                        log.exception("重试端口 %s 也失败: %s", self.port, e2)
-                except Exception as e:
-                    log.exception("uvicorn 异常退出: %s", e)
+                        current_srv.run()
+                        return  # 正常退出
+                    except OSError as e:
+                        # uvicorn 内部 try bind 失败 → 端口冲突
+                        if retry >= MAX_PORT_RETRY:
+                            log.error(
+                                "端口 %s 连续 %s 次启动失败 (%s), 放弃. "
+                                "请检查 5180-%s 端口占用, 或改 .env 的 SIGNIN_WEB_PORT",
+                                original_port, MAX_PORT_RETRY + 1, e,
+                                original_port + MAX_PORT_RETRY,
+                            )
+                            return
+                        retry += 1
+                        self.port = original_port + retry
+                        log.warning(
+                            "端口 %s 启动失败 (%s), 重试 %s/%s → 端口 %s",
+                            original_port + retry - 1, e, retry, MAX_PORT_RETRY, self.port,
+                        )
+                        with self._lock:
+                            self._server = self._build_server()
+                        current_srv = self._server
+                    except Exception as e:
+                        log.exception("uvicorn 异常退出: %s", e)
+                        return
 
             self._thread = threading.Thread(
                 target=_runner, args=(self._server,),
@@ -509,7 +526,10 @@ class SigninWebServer:
         self._wd_stop = None
 
     def _watchdog_loop(self):
-        """每 5s 用 httpx ping localhost, 3 次失败 → 重建 server.
+        """每 5s 用 httpx ping localhost, 6 次连续失败 (30s) → 重建 server.
+
+        W15+ 调整: 阈值从 3 次提到 6 次 (3 → 30s 容错),
+        避免网络抖动 / 临时 H5 提交阻塞误判, 不丢学生请求.
 
         httpx 是 fastapi 测试已有依赖 (requirements.txt), 不增加新包.
         """
@@ -527,9 +547,10 @@ class SigninWebServer:
             else:
                 fail_count += 1
                 log.debug("watchdog: ping port=%s 失败 (count=%s)", self.port, fail_count)
-            if fail_count >= 3:
+            if fail_count >= 6:
                 log.warning(
-                    "watchdog: port=%s 连续 3 次失败, 重建 server",
+                    "watchdog: port=%s 连续 6 次 (30s) 失败, 重建 server "
+                    "(可能是网络抖动或真有故障, 已尽量容错避免误判)",
                     self.port,
                 )
                 try:

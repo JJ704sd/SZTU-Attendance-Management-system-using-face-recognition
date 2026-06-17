@@ -18,23 +18,46 @@ log = logging.getLogger(__name__)
 
 
 def get_lan_ip() -> str:
-    """探测本机局域网 IP（启发式：连 8.8.8.8 不实际发包）。
+    """探测本机局域网 IP（启发式：连 DNS 探默认出口，不实际发包）。
+
+    W15+ 修复: 原版用 Google DNS 8.8.8.8, 国内组员无外网时 UDP connect 会
+    阻塞 3-5s 然后 OSError 兜底返 127.0.0.1 → 教师二维码 URL 是
+    http://127.0.0.1:5180/... → **学生手机扫码连不上**。
+    改用阿里 DNS 223.5.5.5 (国内通, 1.5s timeout), 失败 fallback 到
+    socket.gethostbyname(socket.gethostname())。
 
     边界:
       - 完全离线（无默认路由）→ 返回 "127.0.0.1"
       - 多网卡但走同一默认路由 → 返回默认出口网卡 IP（演示够用）
       - 返回空字符串（极端）→ 兜底 "127.0.0.1"
     """
+    # 首选: 阿里 DNS (国内通, 1.5s timeout, 避免无外网时阻塞)
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     try:
-        s.connect(("8.8.8.8", 80))
+        s.settimeout(1.5)
+        s.connect(("223.5.5.5", 80))
         ip = s.getsockname()[0]
-        return ip or "127.0.0.1"
+        if ip:
+            return ip
     except OSError as e:
-        log.warning("get_lan_ip: UDP connect 失败 (%s)，返回 127.0.0.1", e)
-        return "127.0.0.1"
+        log.warning("get_lan_ip: UDP connect 阿里 DNS 失败 (%s), 尝试 fallback", e)
     finally:
         s.close()
+
+    # Fallback 1: socket.gethostbyname(gethostname())
+    #   多网卡环境下可能返 192.168.x.x 或 10.x.x.x (LAN 内), 也可能返
+    #   127.0.0.1 (主机名解析到回环), 但比 Google DNS 国内可达
+    try:
+        ip = socket.gethostbyname(socket.gethostname())
+        if ip and not ip.startswith("127."):
+            return ip
+    except OSError as e:
+        log.warning("get_lan_ip: gethostbyname fallback 失败 (%s)", e)
+
+    # Fallback 2: 兜底返 127.0.0.1, 教师能看到提示"二维码 URL 是回环地址,
+    # 手机连不上请检查网络"
+    log.warning("get_lan_ip: 所有探测失败, 兜底返 127.0.0.1 (手机扫码可能连不上)")
+    return "127.0.0.1"
 
 
 def is_port_free(port: int, host: str = "0.0.0.0") -> bool:
