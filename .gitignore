@@ -101,3 +101,10 @@ build_log.txt
 # ---------- 临时数据库备份 (cleanup / migration 前的手工导出) ----------
 backups/
 *.sql.bak
+
+# ---------- 交付物 zip (本地打, 不入仓, 给组员/老师分发用) ----------
+# 项目根目录的 attendance-system-submission.zip 是给组员/老师的本地交付物,
+# 跟 PyInstaller onedir 产物一样不入库, 组员用 `git archive` 重新生成.
+attendance-system-submission.zip
+*.zip
+!docs/**/*.zip
