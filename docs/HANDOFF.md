@@ -12,7 +12,7 @@
 | **课程** | 深圳技术大学「数据库原理」课程设计 |
 | **作者** | (课程组, 见 `git log`) |
 | **截止** | 2026-06-20（验收日） |
-| **栈** | Python 3.13.6/3.13.9 + PyQt5 5.15 + MySQL 8.0.29+ + dlib-bin 20.0.1 + SQLAlchemy 2.0 |
+| **栈** | Python 3.10+ (推荐 3.13.x) + PyQt5 5.15 + MySQL 8.0.29+ + dlib-bin 20.0.1 + SQLAlchemy 2.0 |
 | **架构** | 4 层 (ui → service → dao → model) + utils |
 | **数据** | **14 张表** (schema.sql 12 + migration_w13.sql 1 + migration_w14.sql 1) |
 | **代码** | **107 个 .py** / 6 service / 14 widget / 4 主窗口 |
@@ -146,7 +146,7 @@ python -m src.main
 
 | 决策 | 原因 |
 |---|---|
-| `dlib-bin==20.0.1` 而非源码编译 | Python 3.13 + Windows 上 cmake 编译坑多；`dlib-bin` 是预编译 wheel |
+| `dlib-bin==20.0.1` 而非源码编译 | dlib 源码编译要 cmake + VS Build Tools (30+ 分钟)；`dlib-bin` PyPI 有 cp311/cp312/cp313 三个预编译 wheel，3 分钟装好 |
 | 不依赖 `face_recognition` 库 | 1.3.0 在 cp313 上无 wheel；自写 `src/utils/face_helper.py` 4 核心 API |
 | `dlib` 模型不入 git | 单文件 95 MB 接近 GitHub 100 MB 警告线；首次运行时下载 |
 | bcrypt 而非明文 | 课程要求"密码不能明文" |
@@ -200,7 +200,7 @@ python -m src.main
 
 | 维度 | 状态 |
 |---|---|
-| Python 版本 | **3.13.6 / 3.13.9** (项目代码用 PEP 604 `X \| None` 需 3.10+) |
+| Python 版本 | **3.10+** (推荐 3.13.x, 已深度验证; 3.11/3.12 理论能跑) |
 | MySQL 版本 | **8.0.29+** (migration 用 `IF NOT EXISTS` 语法) |
 | 路径硬编码 | **0 个** (所有路径走 `APP_ROOT` 单例 + `Path(__file__).resolve()`) |
 | 平台特定代码 | **0 个** (0 pywin32, 0 sys.platform, 0 shell=True) |

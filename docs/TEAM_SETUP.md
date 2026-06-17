@@ -7,7 +7,7 @@
 
 | 工具 | 版本 | 验证命令 | 备注 |
 |---|---|---|---|
-| **Python** | **3.13.6 或 3.13.9**（**必须**） | `python --version` | 项目代码用 PEP 604 `X \| None` 语法（3.10+）+ dlib-bin 20.0.1 在 3.13 验证通过；3.11/3.12 严格说能跑但 numpy 2.x + matplotlib 3.10 + PyQt5 5.15 组合未验证，可能装上但运行时炸 |
+| **Python** | **3.10+**（推荐 3.13.x） | `python --version` | 项目代码用 PEP 604 `X \| None` 语法（需 3.10+）；dlib-bin 20.0.1 在 PyPI 有 cp311/cp312/cp313 三个 wheel，3.11/3.12 理论能跑。**3.13.x 是远端 CI 全程验证的版本**，188 单元 + 8 smoke 全过 |
 | **MySQL** | **8.0.29+**（**必须**） | `mysql --version` | migration 用 `IF NOT EXISTS` 语法，5.7 / 8.0.28- 不支持；启动 `mysqld` 服务, root 密码记住 |
 | **Git** | 任意 | `git --version` | 拉项目用 |
 | **Webcam** | 任意 USB / 内置 | (无) | 仅"刷脸签到"需要, 数字码 / 二维码不依赖 |
