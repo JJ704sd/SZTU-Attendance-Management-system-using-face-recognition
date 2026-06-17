@@ -147,10 +147,12 @@ src/
 - ✅ **W13+**：教师/学生端数字码 + 二维码签到（对分易式手动触发码）+ 13 张表 + 5 个 smoke
 - ✅ **W14**：FastAPI 嵌入 + H5 签到页 + 多端登录（手机扫码 → 浏览器 → 教师端实时反馈）+ UI 现代化（17 文件）
 - ✅ **W15+**：signin_web 入口路由修复（删 `tok != token` 闭包校验）+ H5 polling 防缓存（`/api/signin/latest`）+ dialog 启动时 `update_token` 同步 + 多 GUI 进程清理工具
+- ✅ **W15+ 跨机可行性体检**：4 P0 (init_db 跑 migration_w14 / 删错误脚本提示 / 统一 Python 3.13 / get_lan_ip 改阿里 DNS) + 5 P1 (main.py 验 .env / 防火墙文档 / 数字同步 / 端口重试 5 次 / watchdog 阈值 6 次) + 3 改进 (gitee 镜像 / 静默 .env warning / start.bat 验 venv) + 1 体检 (业务链路契约三方对齐)
 - ✅ 测试：**188/188** 全过（含 W15+ 新增 3 项 latest API 测试：当前 LIVE token / 刷新后返新 token / 404 NO_LIVE_TOKEN）
-- ✅ Smoke：smoke_signin_web (9 步全链路) + smoke_signin_web_build + audit_history 16/16 + smoke_qrcode_build
-- ✅ GitHub：**57 commit** 已推 feature/ui-modernize（commit `af563bb`）
-- 📋 下一步：课程交付物（报告 PDF / 答辩 PPT / 演示视频 / 提交物 .zip），详 `docs/superpowers/plans/2026-06-07-W12-p0-fixes-and-deliverables.md` + `docs/W14-defense-outline.md`
+- ✅ Smoke：**8 个端到端脚本**（full_flow / real_face / ui_qtest / e2e / signin_methods / audit_history / signin_web / full_regression）
+- ✅ GitHub：**73 commit** 已推 main（截至 `2c2fd10 fix(w15+): 跨机可行性 4 P0 + 5 P1 修复 + 文档同步`）
+- ✅ 跨机打包：PyInstaller onedir **380 MB** 实测可生成（含 dlib 模型 + .env.template），smoke_e2e 验证启动后写 app.log OK
+- 📋 下一步：课程交付物（报告 PDF / 答辩 PPT / 演示视频 / 提交物 .zip），详 `docs/superpowers/plans/2026-06-07-W12-p0-fixes-and-deliverables.md` + `docs/W14-defense-outline.md` + **`docs/HANDOFF.md`（项目交接总入口）**
 
 ## W3 Phase 5 学生端接入时必踩的坑
 

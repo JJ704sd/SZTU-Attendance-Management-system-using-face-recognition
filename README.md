@@ -94,9 +94,10 @@ pyinstaller build.spec
 
 | 想看什么 | 文档 |
 |---|---|
+| **项目交接总入口**（HANDOFF） | [`docs/HANDOFF.md`](docs/HANDOFF.md) |
 | 5 分钟跑通 | [`QUICKSTART.md`](QUICKSTART.md) |
 | 项目架构 / 4 层依赖 | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) |
-| 数据库 13 张表设计 (12 schema + 1 w13+ migration) | [`docs/DATABASE.md`](docs/DATABASE.md) |
+| 数据库 14 张表设计 (12 schema + 1 w13+ migration + 1 w14+ course_teacher) | [`docs/DATABASE.md`](docs/DATABASE.md) |
 | 业务流程 (考勤/准入/请假) | [`docs/WORKFLOWS.md`](docs/WORKFLOWS.md) |
 | 开发者上手 30 分钟 | [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md) |
 | 端到端验证 (W3 学生跑通) | [`docs/MANUAL_E2E.md`](docs/MANUAL_E2E.md) |
@@ -183,7 +184,7 @@ pyinstaller build.spec
 
 ## 提交记录
 
-`git log --oneline` —— 共 **57 个 commit** (W2 → W15+, 14 周迭代 + 6 次审计 + 收口)。
+`git log --oneline` —— 共 **73 个 commit** (W2 → W15+, 14 周迭代 + 5 次 bug 审计 + W12 P0 验收 + W14 收尾 + W15+ 跨机可行性 4 P0 / 5 P1 修复)。
 
 ## 已知约束（项目层面接受,不动）
 
