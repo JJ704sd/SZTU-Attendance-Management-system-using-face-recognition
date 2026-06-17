@@ -109,5 +109,7 @@ attendance-system-submission.zip
 # group-member-package.zip 是 '只发 3 样' 给组员的最简包
 # (源码 zip + TEAM_SETUP.md + TESTING_CHECKLIST.md + README.md)
 group-member-package.zip
+# 课程提交 zip (按组长学号命名, 如 20230101_智能考勤与实验室准入系统_设计方案.zip)
+[0-9]*_智能考勤*.zip
 *.zip
 !docs/**/*.zip
