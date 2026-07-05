@@ -7,7 +7,7 @@
 
 | 工具 | 版本 | 验证命令 | 备注 |
 |---|---|---|---|
-| **Python** | **3.10+**（推荐 3.13.x） | `python --version` | 项目代码用 PEP 604 `X \| None` 语法（需 3.10+）；dlib-bin 20.0.1 在 PyPI 有 cp311/cp312/cp313 三个 wheel，3.11/3.12 理论能跑。**3.13.x 是远端 CI 全程验证的版本**，188 单元 + 8 smoke 全过 |
+| **Python** | **3.10+**（推荐 3.13.x） | `python --version` | 项目代码用 PEP 604 `X \| None` 语法（需 3.10+）；dlib-bin 20.0.1 在 PyPI 有 cp311/cp312/cp313 三个 wheel，3.11/3.12 理论能跑。**3.13.x 是远端 CI 全程验证的版本**，193 单元 + 8 smoke 全过 |
 | **MySQL** | **8.0.29+**（**必须**） | `mysql --version` | migration 用 `IF NOT EXISTS` 语法，5.7 / 8.0.28- 不支持；启动 `mysqld` 服务, root 密码记住 |
 | **Git** | 任意 | `git --version` | 拉项目用 |
 | **Webcam** | 任意 USB / 内置 | (无) | 仅"刷脸签到"需要, 数字码 / 二维码不依赖 |
@@ -214,7 +214,7 @@ pyinstaller build.spec
 # 双击即可运行（首次会跑 init_db + 下 dlib 模型）
 ```
 
-详细见 [docs/PACKAGING.md](PACKAGING.md)。
+详细见 [README.md](../README.md) 的「PyInstaller 打包」章节 + `build.spec`。
 
 ## 故障排除
 
@@ -285,10 +285,10 @@ python -m src.main                             # 验证 GUI 起来
 - **3 种签到方式**：刷脸 / 数字码 (对分易式 60s 倒计时) / 二维码 (base64 token)
 - **W14 多端登录签到**：FastAPI 嵌入 + H5 签到页 (手机扫码 → 浏览器 → 教师端实时反馈)
 - **依赖**：PyQt5 + SQLAlchemy 2.0 + dlib-bin + opencv + bcrypt + qrcode + fastapi + uvicorn + jinja2 + httpx
-- **测试**：188 单元 + 8 smoke
+- **测试**：193 单元 + 8 smoke
 - **打包**：PyInstaller onedir 380 MB
 
-详细看 [README.md](../README.md) + [CLAUDE.md](../CLAUDE.md) + [docs/PACKAGING.md](PACKAGING.md) + [docs/SMOKE_TESTS.md](SMOKE_TESTS.md) + [docs/SIGNIN_METHODS.md](SIGNIN_METHODS.md) + [docs/TESTING_CHECKLIST.md](TESTING_CHECKLIST.md)。
+详细看 [README.md](../README.md) + [CLAUDE.md](../CLAUDE.md) + [docs/SIGNIN_METHODS.md](SIGNIN_METHODS.md) + [docs/TESTING_CHECKLIST.md](TESTING_CHECKLIST.md)；smoke 用法见 [README.md § 验收](../README.md#验收)。
 
 ---
 

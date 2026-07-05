@@ -16,7 +16,7 @@
 | **架构** | 4 层 (ui → service → dao → model) + utils |
 | **数据** | **14 张表** (schema.sql 12 + migration_w13.sql 1 + migration_w14.sql 1) |
 | **代码** | **107 个 .py** / 6 service / 14 widget / 4 主窗口 |
-| **测试** | **188 单元 / 8 smoke 端到端**（全过 ~55s） |
+| **测试** | **193 单元 / 8 smoke 端到端**（全过 ~60s） |
 | **打包** | PyInstaller onedir **~380 MB** |
 | **3 种签到** | 刷脸 (dlib 距离匹配) / 数字码 (对分易式 60s 倒计时) / 二维码 (base64 token) |
 | **W14+ 新功能** | FastAPI 嵌入 + H5 签到页 (手机扫码 → 浏览器 → 教师端实时反馈) |
@@ -28,17 +28,17 @@
 |---|---|---|
 | **课程组员**（在自己电脑跑） | [docs/TEAM_SETUP.md](TEAM_SETUP.md) | 0-5 步上手 + 防火墙 + 故障排除 |
 | **老师 / 验收人**（5 分钟看完） | 本文档 § 6「10 步验收」 | 每个勾打上即可 |
-| **答辩演示人**（录视频 + 答辩） | [docs/TESTING_CHECKLIST.md](TESTING_CHECKLIST.md) + [docs/DEMO_RECORDING.md](DEMO_RECORDING.md) | 10 步 + 录屏脚本 |
-| **半年后的自己**（接手维护） | 本文档 + [CLAUDE.md](../CLAUDE.md) + [docs/ARCHITECTURE.md](ARCHITECTURE.md) | 仓库结构 + 4 层依赖 |
-| **想跑通 188 项测试** | [docs/SMOKE_TESTS.md](SMOKE_TESTS.md) | 8 个 smoke 命令 |
-| **想打 .exe** | [docs/PACKAGING.md](PACKAGING.md) | onedir 模式说明 |
+| **答辩演示人**（录视频 + 答辩） | [docs/TESTING_CHECKLIST.md](TESTING_CHECKLIST.md) + [submission/04_DEMO_VIDEO_SCRIPT.md](../submission/04_DEMO_VIDEO_SCRIPT.md) | 10 步 + 录屏脚本 |
+| **半年后的自己**（接手维护） | 本文档 + [CLAUDE.md](../CLAUDE.md) | 仓库结构 + 4 层依赖 |
+| **想跑通 193 项测试** | [README.md § 验收](../README.md#验收) | 8 个 smoke 命令 |
+| **想打 .exe** | [README.md § 关键技术决策](../README.md#关键技术决策) + `build.spec` | onedir 模式说明 |
 
 ## 3. 仓库结构（一图看全）
 
 ```
 Attendance-Management-system-using-face-recognition/  ← 你解压后看到的
 ├── README.md                      ← 项目门面 (5 分钟看完)
-├── QUICKSTART.md                  ← 5 分钟跑通 (跟 README 互补)
+├── 快速验证.md                    ← 5 分钟跑通 (跟 README 互补)
 ├── CLAUDE.md                      ← 给 AI agent 的项目说明 (架构 + 决策 + 坑)
 ├── LICENSE                        ← MIT
 ├── requirements.txt               ← 15 个依赖 (PyQt5 + SQLAlchemy + dlib-bin + qrcode + ...)
@@ -84,22 +84,11 @@ Attendance-Management-system-using-face-recognition/  ← 你解压后看到的
 │   ├── HANDOFF.md                 ← 你正在读
 │   ├── TEAM_SETUP.md              ← 组员跨机上手 9 步
 │   ├── TESTING_CHECKLIST.md       ← 10 步亲自测试 + 故障速查
-│   ├── ARCHITECTURE.md            ← 4 层依赖图 + 数据流
+│   ├── CHECKLIST_FOR_REVIEWER.md  ← 老师 / 验收人 5 分钟跳完
 │   ├── DATABASE.md                ← 14 张表设计
-│   ├── WORKFLOWS.md               ← 业务流程 (考勤/准入/请假)
-│   ├── DEVELOPMENT.md             ← 开发者 30 分钟上手
-│   ├── PACKAGING.md               ← PyInstaller 打包
-│   ├── SMOKE_TESTS.md             ← 8 smoke 端到端
 │   ├── SIGNIN_METHODS.md          ← 3 种签到方式详细说明
-│   ├── MANUAL_E2E.md              ← 端到端手测
-│   ├── DEMO_RECORDING.md           ← 演示视频录制脚本
-│   ├── RECORD_QUICKSTART.md       ← 录屏 5 分钟速成
-│   ├── RECORD_STEP_BY_STEP.md     ← 录屏分步脚本
-│   ├── demo_narration.md / .srt   ← 演示旁白文稿
-│   ├── CHANGELOG.md               ← 版本变更
-│   ├── TODO.md                    ← 后续待办
-│   ├── W14-defense-outline.md     ← 答辩提纲
-│   └── superpowers/plans/         ← 5 份 W3-W14 实施计划
+│   ├── W14-defense-outline.md     ← 答辩 PPT 大纲
+│   └── superpowers/plans/         ← 6 份 W3-W14 实施计划
 │
 ├── scripts/                       ← **运维 + 烟测** (12 个)
 │   ├── init_db.py                 ← ⭐ 一键建 14 张表 (跨机适配修过)
@@ -171,7 +160,7 @@ python -m src.main
 | 6 | **二维码签到**: 教师弹码 → 学生扫 → 出勤 | attendance_record 多一行 signin_method='qr' | ☐ |
 | 7 | **手机扫码 H5**: 教师点"二维码签到" → 手机浏览器打开 H5 → 提交 | attendance_record 多一行 signin_method='qr' (从手机来) | ☐ |
 | 8 | **关闭任务**: 教师点"结束选中任务" | 没签到的学生自动 absent, 请过假的变 leave | ☐ |
-| 9 | **自动化测试**: `pytest tests/ -q` | 188 passed in ~55s | ☐ |
+| 9 | **自动化测试**: `pytest tests/ -q` | 193 passed in ~60s | ☐ |
 
 详细手机扫码步骤 + 防火墙授权 + 故障排除见 [docs/TESTING_CHECKLIST.md](TESTING_CHECKLIST.md)。
 
@@ -179,10 +168,10 @@ python -m src.main
 
 | 指标 | 数据 |
 |---|---|
-| Git commit 数 | 73 (W2 → W15+) |
+| Git commit 数 | 83 (W2 → W15+) |
 | 入库文件数 | 147 (107 .py + 23 .md + 5 .sql + 12 .bat/.spec/.template) |
 | 入库代码大小 | ~970 KB (压缩后 ~400 KB) |
-| 测试覆盖 | 188 单元 / 8 smoke 端到端 / 0 warning（除 7 个第三方库 deprecation） |
+| 测试覆盖 | 193 单元 / 8 smoke 端到端 / 7 warning（3 个 starlette/websockets/uvicorn 第三方库 deprecation） |
 | 迭代周数 | 14 周 (W2 / W3 / W4 / W5 / W6 / W7 / W8 / W9 / W10 / W11 / W12 / W13+ / W14 / W15+) |
 | Bug 审计次数 | 5 次 (W7/W8/W9/W10/W11) + W12 P0 验收 + W14 收尾 + W15+ 跨机可行性 |
 | 跨机可行性 P0 数 | 0 (4 修 + 5 P1 修 + 3 改进) |
@@ -216,19 +205,18 @@ python -m src.main
 1. **先读 [CLAUDE.md](../CLAUDE.md)** — 3 分钟了解架构 + 决策 + 坑
 2. **跑 `pytest tests/ -q`** — 5 分钟验证环境
 3. **跑 8 个 smoke** — 10 分钟验证业务流
-4. **看 [docs/ARCHITECTURE.md](ARCHITECTURE.md)** — 30 分钟理解 4 层依赖
-5. **看 [docs/superpowers/plans/](superpowers/plans/)** — 5 份 W3-W14 实施计划，看迭代过程
-6. **改任何代码前先跑测试** — 188 项测试覆盖了主要业务流
+4. **看 `src/` 4 层代码 + `src/ui/styles.py`** — 30 分钟理解 4 层依赖（ui→service→dao→model 严格自顶向下）
+5. **看 [docs/superpowers/plans/](superpowers/plans/)** — 6 份 W3-W14 实施计划，看迭代过程
+6. **改任何代码前先跑测试** — 193 项测试覆盖了主要业务流
 
 **如果遇到"代码改完测试挂了"**:
 - 先看 `git log -p` 最近几个 commit 的 diff
-- 再看 [docs/CHANGELOG.md](CHANGELOG.md) 版本变更
 - 必要时 `git revert <hash>` 回到上个稳定状态
 
 **如果遇到"代码改完打包挂了"**:
 - 跑 `pyinstaller --clean build.spec` 清缓存
 - 跑 `pip install -r requirements.txt --upgrade --force-reinstall` 重装依赖
-- 看 [docs/PACKAGING.md](PACKAGING.md)
+- 看 `build.spec` 顶部 `hiddenimports` 列表
 
 ---
 

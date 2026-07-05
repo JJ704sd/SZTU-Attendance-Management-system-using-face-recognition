@@ -109,10 +109,10 @@ src/
 | `db/schema.sql` | MySQL DDL（12 张表，utf8mb4） |
 | `db/migration_w13.sql` | W13+ 增量迁移：`task_signin_code` 新表 + `attendance_record.signin_method` 字段 |
 | `db/migration_w14.sql` | W14+ 增量迁移：`course_teacher` 多对多表（Q3=B schema 变更） |
-| `docs/` | 设计文档（PROJECT_PLAN / ARCHITECTURE / STRUCTURE / DEVELOPMENT / DATABASE / WORKFLOWS / TEAM_AND_TIMELINE） |
+| `docs/` | 设计文档（HANDOFF / TEAM_SETUP / TESTING_CHECKLIST / CHECKLIST_FOR_REVIEWER / DATABASE / SIGNIN_METHODS / W14-defense-outline） |
 | `docs/SIGNIN_METHODS.md` | W13+ 签到方式完整文档（刷脸/数字码/二维码对比 + 操作手册） |
 | `docs/superpowers/plans/` | 实施计划（按 writing-plans skill 格式）。当前最新：`2026-06-07-W12-p0-fixes-and-deliverables.md`（W12 P0 验收修复 + W13+ 课程交付计划，截止2026-06-20） |
-| `tests/` | 单元测试（**188/188** 全过，~72s 7 warning；含 1 项 dtype 回归 + 1 项 collect_for_user 死循环回归 + W12 新增 18 项 camera/admin_tab 覆盖 + W13+ 新增 18 项 signin_methods + W14 新增 11 项 signin_web + 10 项 UI 现代化 + 5 项 task_signin_code_dao + **W15+ 新增 3 项 latest API 测试**） |
+| `tests/` | 单元测试（**193/193** 全过，~60s 7 warning；含 1 项 dtype 回归 + 1 项 collect_for_user 死循环回归 + W12 新增 18 项 camera/admin_tab 覆盖 + W13+ 新增 18 项 signin_methods + W14 新增 11 项 signin_web + 10 项 UI 现代化 + 5 项 task_signin_code_dao + **W15+ 新增 3 项 latest API 测试**） |
 | `scripts/` | 运维 + 烟测脚本（init_db / run_dev / seed_demo_data / cleanup_test_users / smoke_full_flow / smoke_real_face / smoke_ui_qtest / smoke_e2e / **smoke_signin_methods** / **smoke_audit_history** / **smoke_qrcode_build** / **smoke_signin_web** / **smoke_signin_web_build** / **import_schedule** / **cleanup_test_classrooms**） |
 | `dist/` `build/` | PyInstaller onedir打包产物（git ignore，不入库） |
 | `models/` | dlib 模型权重（git ignore，运行时下载） |
@@ -165,4 +165,4 @@ src/
 
 参考：Qt 跨线程信号固定 `Qt.QueuedConnection` 即可。
 
-详细分工见 `docs/TEAM_AND_TIMELINE.md`。
+详细分工见 `submission/05_GROUP_MEMBERS.md`。

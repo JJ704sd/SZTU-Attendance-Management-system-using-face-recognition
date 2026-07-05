@@ -27,7 +27,7 @@
 - **W15+ UI 现代化**：5 主窗体 + 12 widget margin/spacing 加大 + design tokens（`RADIUS_*` / `SHADOW_*` / `FONT_SIZE_*` / `SPACING_*`），演示场景老人看着不累
 - **6 次审计修复**（W7-W15+ 共 36+ 真 bug）：死 import / 死方法 / 排序 tie-break / 测试污染 / bool Lock race / 资源泄漏 / 双摄像头冲突 / int-env 转换 / signin_web 闭包 token 校验 / H5 缓存
 - **PyInstaller onedir 380 MB 真一键 exe**：双击即跑，开发与交付同链路
-- **测试覆盖 188/188**：含 1 dtype 回归 + 1 collect_for_user 死循环回归 + 8 smoke 端到端（业务流 / 真脸 / QTest / 打包 / W13+ 签到 / W7-W12 历史修复回归 / W14+ 多端登录 9 步 / W14+ 打包后多端登录）+ 3 W15+ latest API 测试
+- **测试覆盖 193/193**：含 1 dtype 回归 + 1 collect_for_user 死循环回归 + 8 smoke 端到端（业务流 / 真脸 / QTest / 打包 / W13+ 签到 / W7-W12 历史修复回归 / W14+ 多端登录 9 步 / W14+ 打包后多端登录）+ 3 W15+ latest API 测试
 
 ## 快速上手
 
@@ -36,7 +36,7 @@
 pip install -r requirements.txt
 
 # 2. 配 .env (含 DB 密码)
-cp .env.template .env
+cp .env.example .env
 # 编辑 .env 填 DB_PASSWORD
 
 # 3. 初始化数据库（首次）
@@ -56,7 +56,7 @@ kill_all_python.bat   # 清干净再双击 start.bat
 - 学生：`test001 / 123456`（如被 W4 防爆破锁定,演示前清 `login_attempt` 表）或 `demo_student / 123456`（W14+ 多端登录演示用，student_id=`202400502133`）
 - 教师：`teacher01 / 123456`（基础）或 `teacher001 / 123456`（W13+ / W14+ 演示用，已挂 BME201 + 两个 open task）
 
-详见 [`QUICKSTART.md`](QUICKSTART.md) 或 [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md)。
+详见 [`快速验证.md`](快速验证.md) 或 [`docs/TEAM_SETUP.md`](docs/TEAM_SETUP.md)。
 
 ## 3 角色 / 4-5 Tab / 5 业务线
 
@@ -82,7 +82,7 @@ kill_all_python.bat   # 清干净再双击 start.bat
 ## 验收
 
 ```bash
-# 单元测试 (188 项 / ~72s 7 warning)
+# 单元测试 (193 项 / ~60s 7 warning)
 .venv\Scripts\python.exe -m pytest tests/ -q
 
 # 8 个 smoke 端到端脚本
@@ -99,24 +99,21 @@ kill_all_python.bat   # 清干净再双击 start.bat
 pyinstaller build.spec
 ```
 
-详细说明见 [`docs/SMOKE_TESTS.md`](docs/SMOKE_TESTS.md) + [`docs/PACKAGING.md`](docs/PACKAGING.md)。
+详细说明见 `requirements.txt` + `build.spec` + `scripts/smoke_*.py`（smoke 用法见下）。
 
 ## 文档导航
 
 | 想看什么 | 文档 |
 |---|---|
 | **项目交接总入口**（HANDOFF） | [`docs/HANDOFF.md`](docs/HANDOFF.md) |
-| 5 分钟跑通 | [`QUICKSTART.md`](QUICKSTART.md) |
-| 项目架构 / 4 层依赖 | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) |
+| 5 分钟跑通 | [`快速验证.md`](快速验证.md) |
 | 数据库 14 张表设计 (12 schema + 1 w13+ migration + 1 w14+ course_teacher) | [`docs/DATABASE.md`](docs/DATABASE.md) |
-| 业务流程 (考勤/准入/请假) | [`docs/WORKFLOWS.md`](docs/WORKFLOWS.md) |
-| 开发者上手 30 分钟 | [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md) |
-| 端到端验证 (W3 学生跑通) | [`docs/MANUAL_E2E.md`](docs/MANUAL_E2E.md) |
-| **PyInstaller 打包 (W5)** | [`docs/PACKAGING.md`](docs/PACKAGING.md) |
-| **Smoke 测试指南 (W6)** | [`docs/SMOKE_TESTS.md`](docs/SMOKE_TESTS.md) |
 | **3 种签到方式 (W13+, 刷脸/数字码/二维码)** | [`docs/SIGNIN_METHODS.md`](docs/SIGNIN_METHODS.md) |
-| **演示视频录制脚本 (W8)** | [`docs/DEMO_RECORDING.md`](docs/DEMO_RECORDING.md) + [`RECORD_STEP_BY_STEP.md`](docs/RECORD_STEP_BY_STEP.md) + 字幕 [`demo_narration.srt`](docs/demo_narration.srt) |
-| 计划文档 (W3-W12+W13+) | [`docs/superpowers/plans/`](docs/superpowers/plans/) |
+| 老师 / 验收人 10 步清单 | [`docs/CHECKLIST_FOR_REVIEWER.md`](docs/CHECKLIST_FOR_REVIEWER.md) |
+| 10 步亲自测试 + 故障速查 | [`docs/TESTING_CHECKLIST.md`](docs/TESTING_CHECKLIST.md) |
+| 答辩 PPT 大纲 | [`docs/W14-defense-outline.md`](docs/W14-defense-outline.md) |
+| 课程提交 5 份文档（设计方案/参考声明/PPT/演示脚本/组员分工） | [`submission/`](submission/) |
+| 计划文档 (W3-W14) | [`docs/superpowers/plans/`](docs/superpowers/plans/) |
 | AI 协作者上下文 | [`CLAUDE.md`](CLAUDE.md) |
 
 ## 仓库结构
@@ -124,11 +121,11 @@ pyinstaller build.spec
 ```
 .
 ├── README.md                  ← 你正在看
-├── QUICKSTART.md              ← 5 分钟跑通
+├── 快速验证.md              ← 5 分钟跑通
 ├── CLAUDE.md                  ← AI 协作者上下文 (架构/陷阱/当前进度)
-├── requirements.txt           ← 主依赖 (W14 后已清空 dlib-bin 备选注释)
+├── requirements.txt           ← 主依赖
 ├── build.spec                 ← PyInstaller 配置 (W5)
-├── .env.template              ← 环境变量模板 (W5)
+├── .env.example               ← 环境变量模板 (W15+ 改名, 旧名 .env.template 已删)
 ├── .gitignore
 │
 ├── db/
@@ -136,29 +133,38 @@ pyinstaller build.spec
 │   ├── migration_w13.sql      ← W13+ 增量 (task_signin_code 新表 + signin_method 字段)
 │   └── migration_w14.sql      ← W14+ 增量 (course_teacher 多对多表, Q3=B schema 变更)
 │
-├── docs/                      ← 设计文档 (10 个 + 录屏脚本)
-│   ├── ARCHITECTURE.md / DATABASE.md / WORKFLOWS.md / DEVELOPMENT.md
-│   ├── MANUAL_E2E.md          ← W3 端到端
-│   ├── PACKAGING.md           ← W5 打包
-│   ├── SMOKE_TESTS.md         ← W6 smoke 指南
+├── docs/                      ← 设计文档 (7 个 + 录屏脚本 superpowers/plans/)
+│   ├── HANDOFF.md             ← 项目交接总入口
+│   ├── TEAM_SETUP.md          ← 组员跨机上手 9 步
+│   ├── TESTING_CHECKLIST.md   ← 10 步亲自测试 + 故障速查
+│   ├── CHECKLIST_FOR_REVIEWER.md ← 老师/验收人 5-10 分钟清单
+│   ├── DATABASE.md            ← 14 张表设计
 │   ├── SIGNIN_METHODS.md      ← W13+ 3 种签到方式
-│   ├── DEMO_RECORDING.md + RECORD_STEP_BY_STEP.md + demo_narration.md/srt
-│   ├── TODO.md                ← W11 36 领域扫后续待办
-│   └── superpowers/plans/     ← W3-W15+ 计划 (5 个)
+│   ├── W14-defense-outline.md ← 答辩 PPT 大纲
+│   └── superpowers/plans/     ← W3-W14 实施计划 (6 个)
+│
+├── submission/                ← 课程提交 5 份文档 + 1 清单
+│   ├── 01_DESIGN_PROPOSAL.md
+│   ├── 02_ATTRIBUTION.md
+│   ├── 03_REPORT_PPT_OUTLINE.md
+│   ├── 04_DEMO_VIDEO_SCRIPT.md
+│   ├── 05_GROUP_MEMBERS.md
+│   └── 课程提交物清单.md
 │
 ├── src/                       ← 项目代码 (4 层架构)
 │   ├── main.py                ← 入口
-│   ├── config.py / db.py / constants.py
-│   ├── models/                ← 9 个 ORM 文件 (W14+ 加 course_teacher.py)
-│   ├── dao/                   ← 14 个数据访问类 (W14+ 加 course_teacher_dao)
-│   ├── services/              ← 6 个业务服务 (auth/face/attendance/lab/leave/report)
+│   ├── config.py / db.py
+│   ├── models/                ← ORM 文件 (10 个, W14+ 加 course_teacher.py)
+│   ├── dao/                   ← 数据访问类 (12 个, 含 task_signin_code)
+│   ├── services/              ← 业务服务 (auth/face/attendance/lab/leave/report/signin_web 7 个)
 │   ├── ui/                    ← PyQt5 表现层 (5 主窗口 + 14 widget, W15+ UI 现代化)
-│   └── utils/                 ← 工具 (dlib/paths/charts/crypto/network)
+│   └── utils/                 ← 工具 (face_helper/crypto/charts/network/paths)
 │
-├── tests/                     ← 188 项单元测试 (18 个文件, 含 W15+ 3 项 latest API)
+├── tests/                     ← 193 项单元测试 (27 个文件, 含 W15+ 3 项 latest API)
 │
 ├── scripts/                   ← 运维 + 8 个端到端 smoke + W14+ 工具
 │   ├── init_db.py / seed_demo_data.py / cleanup_test_users.py
+│   ├── build_2_zips.py / prepare_deliverable_zip.py ← W15+ 课程交付物打包
 │   ├── run_dev.sh / run_dev.bat              ← 全 ASCII + chcp 65001
 │   ├── smoke_full_flow.py        ← W6 业务流
 │   ├── smoke_real_face.py        ← W6 真脸
@@ -166,6 +172,7 @@ pyinstaller build.spec
 │   ├── smoke_e2e.py              ← W5 打包后端到端
 │   ├── smoke_signin_methods.py   ← W13+ 数字码 + 二维码
 │   ├── smoke_audit_history.py    ← W7-W12 16 项历史修复回归
+│   ├── smoke_qrcode_build.py     ← W14+ 防 hiddenimports 漏配 (二维码)
 │   ├── smoke_signin_web.py       ← W14+ 9 步全链路
 │   ├── smoke_signin_web_build.py ← W14+ 打包后多端登录
 │   ├── import_schedule.py        ← W14+ 课表导入 (Q1=B Q2=A Q3=B Q4=C)
@@ -207,7 +214,7 @@ pyinstaller build.spec
 
 ## 课程交付物（截止 2026-06-20,本周内完成）
 
-- [ ] 课程报告 PDF（建议按 `docs/STRUCTURE.md` 的 10 个章节写）
-- [ ] 答辩 PPT（15-20 页, 架构 + 核心功能 + 演示截图；W14+ 多端登录要单独一节）
-- [ ] 演示视频（5-10 分钟, 跟着 `docs/DEMO_RECORDING.md` + `RECORD_STEP_BY_STEP.md` + `demo_narration.srt` 录；**W14+ 多端登录签到 1 分钟专项**：教师屏二维码 → 学生手机扫码 → 浏览器 H5 → 输账密 → 教师端实时反馈）
-- [ ] 提交物 .zip（项目源码 + 文档 + 视频 + 报告, 不含 .venv / build / dist / dataset）
+- [ ] 课程报告 PDF（建议按 `submission/03_REPORT_PPT_OUTLINE.md` 的 10 个章节写）
+- [ ] 答辩 PPT（15-20 页, 架构 + 核心功能 + 演示截图；W14+ 多端登录要单独一节，按 `docs/W14-defense-outline.md` 的 P1-P15 顺序排）
+- [ ] 演示视频（5-10 分钟, 跟着 `submission/04_DEMO_VIDEO_SCRIPT.md` 录；**W14+ 多端登录签到 1 分钟专项**：教师屏二维码 → 学生手机扫码 → 浏览器 H5 → 输账密 → 教师端实时反馈）
+- [ ] 提交物 .zip（项目源码 + 文档 + 视频 + 报告, 不含 .venv / build / dist / dataset；脚本 `python scripts/build_2_zips.py` 一键生成）

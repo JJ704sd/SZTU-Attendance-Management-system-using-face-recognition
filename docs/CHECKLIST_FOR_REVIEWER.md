@@ -65,7 +65,7 @@ python scripts\init_db.py
 | **手机扫码后 URL 是 127.0.0.1** | 教师电脑网络出不去, get_lan_ip 兜底失败 | 教师电脑连能访问阿里 DNS (223.5.5.5) 的网络重试; 或重启 `python -m src.main` |
 | pytest 报"Access denied" | DB_PASSWORD 错 | 改 .env |
 | pytest 报"Table doesn't exist" | 没跑 init_db.py | `python scripts\init_db.py` |
-| PyInstaller 报"hidden import" | 漏列 service | 已在 `build.spec` 列出 13 个, 不该出问题; 若出问题看 `docs/PACKAGING.md` |
+| PyInstaller 报"hidden import" | 漏列 service | 已在 `build.spec` 列出 13 个, 不该出问题; 若仍有问题直接清缓存 `pyinstaller --clean build.spec` + 重装依赖 |
 | 摄像头打不开 | 隐私设置 / 被占用 | 关 QQ/微信/Zoom, 设置→隐私→摄像头→允许桌面应用 |
 
 ## 5 分钟能看完的"为什么这个项目通过验收"
