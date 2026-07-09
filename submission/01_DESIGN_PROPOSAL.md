@@ -32,14 +32,14 @@
 
 ### 1.4 技术栈
 - **后端**: Python 3.10+ / SQLAlchemy 2.0 ORM / PyMySQL / bcrypt
-- **UI**: PyQt5 5.15 (4 主窗口 + 14 widget)
+- **UI**: PyQt5 5.15 (5 主窗口 + 13 widget)
 - **人脸识别**: dlib-bin 20.0.1 (预编译 wheel, 避开 cmake 编译)
 - **二维码**: qrcode 8.2 + opencv-python 4.13 (解码)
 - **W14 H5**: FastAPI 0.115 + uvicorn 0.32 + jinja2 + httpx
 - **统计**: matplotlib 3.10 (4 类图表)
 - **数据库**: MySQL 8.0.29+ (14 张表, utf8mb4)
 - **打包**: PyInstaller 6.x onedir
-- **测试**: pytest 8+ (188 单元 + 8 smoke 端到端)
+- **测试**: pytest 8+ (219 单元 + 10 smoke 端到端)
 
 ---
 
@@ -82,7 +82,7 @@
 | 数据完整性 | 13 → 14 张表 + 19 FK + 3 UNIQUE | 14 张表 + 19 FK + 3 UNIQUE (W12 验证) |
 | 跨平台 | Windows 10/11 (本课程范围) | 0 pywin32, 0 sys.platform, PyQt5 跨平台基础 |
 | 可移植 | 跨电脑可装可跑 | 跨机可行性 4 P0 + 5 P1 修复 (W15+) |
-| 可测试 | ≥ 80% 覆盖 | 188 单元 + 8 smoke 端到端 (~95% 核心逻辑) |
+| 可测试 | ≥ 80% 覆盖 | 219 单元 + 10 smoke 端到端 (~95% 核心逻辑) |
 
 ---
 
@@ -93,14 +93,14 @@
 ```
 ┌────────────────────────────────────────────────────────────┐
 │  UI 层 (src/ui/)                                              │
-│  - 4 主窗口: login / register / student / teacher / admin  │
-│  - 14 widget: camera / face_collect / 3 种签到 / 请假 / ... │
+│  - 5 主窗口: login / register / student / teacher / admin  │
+│  - 13 widget: camera / face_collect / 3 种签到 / 请假 / ... │
 │  - 框架: PyQt5 5.15 + design tokens (RADIUS/SHADOW/SPACING) │
 └────────────────────────────────────────────────────────────┘
                           ↓ 调 service
 ┌────────────────────────────────────────────────────────────┐
 │  Service 层 (src/services/)                                  │
-│  - 6 service: auth / attendance / face / lab_access /        │
+│  - 7 service: auth / attendance / face / lab_access /        │
 │              leave / report (+ signin_web W14)             │
 │  - 业务逻辑: 3 种签到统一 _create_record 公共核 (W13+)     │
 │  - 上下文: with session_scope() as s: 自动 commit/rollback │
@@ -135,7 +135,7 @@
 └────────────────────────────────────────────────────────────┘
 ```
 
-### 3.2 模块划分 (6 service / 13 dao / 8 model / 14 widget / 4 主窗口)
+### 3.2 模块划分 (7 service / 15 dao / 10 model / 13 widget / 5 主窗口)
 
 | 类别 | 数量 | 详情 |
 |---|---|---|
@@ -152,7 +152,7 @@
 3. **dlib 模型不入 git** — 单文件 95 MB 接近 GitHub 100 MB 警告线, 首次运行时下载
 4. **bcrypt 而非明文** — 课程要求"密码不能明文"
 5. **SQLAlchemy 2.0 ORM** — 防 SQL 注入 + 跨数据库可移植
-6. **PyQt5 而非 Tkinter** — 控件丰富, 4 主窗口大量表格 + 表单
+6. **PyQt5 而非 Tkinter** — 控件丰富, 5 主窗口大量表格 + 表单
 7. **face encoding 统一 np.float32** — 序列化/比对链路量纲一致, 有 `test_face_encodings_dtype_is_float32` 锁住
 8. **src/utils/paths.py::APP_ROOT 单例** — dev 走 `Path(__file__).resolve().parent.parent.parent`, 打包后走 `Path(sys.executable).resolve().parent`
 9. **W14 FastAPI 嵌入 PyQt 进程** — uvicorn.Server + threading.Thread(daemon=True), closeEvent 时 `srv.should_exit = True`
@@ -302,7 +302,7 @@ def _create_record(self, task_id, user_id, signin_method, match_score=None):
 
 ## 6. 测试方案
 
-### 6.1 单元测试 (188 项, pytest)
+### 6.1 单元测试 (219 项, pytest)
 
 | 文件 | 测试项 | 覆盖 |
 |---|---|---|
@@ -321,9 +321,9 @@ def _create_record(self, task_id, user_id, signin_method, match_score=None):
 | test_styles.py | ~5 | design tokens |
 | test_conftest.py | autouse | 清理 UUID 测试用户 |
 
-**总**: 188 passed, 7 warnings (全部是 starlette / websockets / pydantic 第三方库 deprecation, 与本项目无关)
+**总**: 219 passed, 3 warnings (全部是 fastapi/testclient + starlette + websockets 第三方库 deprecation, 与本项目无关)
 
-### 6.2 端到端测试 (8 smoke)
+### 6.2 端到端测试 (10 smoke)
 
 | smoke | 验证 |
 |---|---|
@@ -349,7 +349,7 @@ def _create_record(self, task_id, user_id, signin_method, match_score=None):
 |---|---|
 | main.py 启动验 .env | .env 缺失直接弹明确提示 |
 | TEAM_SETUP.md 加防火墙说明 | 组员不会被防火墙卡 |
-| TEAM_SETUP.md 数字同步 | 188 / 14 表 / 8 smoke 数字一致 |
+| TEAM_SETUP.md 数字同步 | 219 / 14 表 / 10 smoke 数字一致 |
 | signin_web 端口重试 5 次 | 5180-5184 都能用 |
 | signin_web watchdog 6 次 | 30s 容错避免误判 |
 
@@ -384,13 +384,13 @@ def _create_record(self, task_id, user_id, signin_method, match_score=None):
 
 - 4 层架构 (ui → service → dao → model) 设计
 - 14 张表 schema + 19 FK 关系
-- 6 个 service 业务逻辑
-- 14 个 widget UI 控件
+- 7 个 service 业务逻辑
+- 13 个 widget UI 控件
 - **W14 多端登录 (FastAPI 嵌入 + H5 签到页 + signin_web watchdog)**
 - **3 种签到方式统一公共核 (`_create_record`)**
 - **跨机可行性 4 P0 修复** (get_lan_ip / init_db / TEAM_SETUP / .gitignore)
-- **5 次 bug 审计 (W7-W12, 36 真 bug 修复)**
-- 188 单元测试 + 8 smoke 端到端
+- **6 次 bug 审计 (W7-W12, 36 真 bug 修复 + W16 docs/arch/UI 联审)**
+- 219 单元测试 + 10 smoke 端到端
 
 ---
 
@@ -404,7 +404,7 @@ def _create_record(self, task_id, user_id, signin_method, match_score=None):
 | [组员1学号] | [组员1姓名] | 人脸识别 + 签到功能 | face_service / face_helper / 3 种签到 / CameraWidget |
 | [组员2学号] | [组员2姓名] | 教师端 + 管理员端 | teacher_window / admin_window / 5 widget / matplotlib 报表 |
 | [组员3学号] | [组员3姓名] | W14 多端登录 + 签到码 | signin_web / signin_code_dialog / FastAPI 嵌入 / H5 模板 |
-| [组员4学号] | [组员4姓名] | 测试 + 文档 | 188 单元 / 8 smoke / 5 份 docs/ / 演示视频 |
+| [组员4学号] | [组员4姓名] | 测试 + 文档 | 219 单元 / 10 smoke / 5 份 docs/ / 演示视频 |
 
 **组员签名**: 详见 `submission/05_GROUP_MEMBERS.md` 末页
 
@@ -429,13 +429,13 @@ def _create_record(self, task_id, user_id, signin_method, match_score=None):
 
 `https://github.com/JJ704sd/SZTU-Attendance-Management-system-using-face-recognition`
 
-- 76 commit / 149 文件 / 988.6 KB
+- 101 commit (audit-round16 HEAD) / 149 文件 / 988.6 KB
 - main 分支
-- 含完整迭代历史 (W2-W15+, 14 周)
+- 含完整迭代历史 (W2-W15+, 14 周 + W16 R16 联审)
 
 ### 9.3 测试统计
 
-- **pytest**: 188/188 passed (~55s, 7 warnings 全部是第三方库 deprecation)
+- **pytest**: 219/219 passed (~67s, 3 warnings 全部是第三方库 deprecation)
 - **smoke**: 8/8 PASS (full_flow / real_face / ui_qtest / e2e / signin_methods / audit_history / signin_web / full_regression)
 - **跨机可行性**: 4 P0 + 5 P1 修复全过
 
@@ -462,8 +462,8 @@ def _create_record(self, task_id, user_id, signin_method, match_score=None):
 |---|---|---|
 | 0:00-0:30 | 项目背景 + 业务痛点 | 传统签到效率低 / 3 种签到 / W14 多端 |
 | 0:30-1:30 | 系统架构 + 14 张表 | 4 层架构 / SQLAlchemy / 19 FK / 3 UNIQUE |
-| 1:30-3:00 | 核心功能演示 | 3 种签到 / W14 手机扫码 / 5 次 bug 审计 |
-| 3:00-4:00 | 测试 + 跨机适配 | 188 单元 / 8 smoke / 4 P0 修复 |
+| 1:30-3:00 | 核心功能演示 | 3 种签到 / W14 手机扫码 / 6 次 bug 审计 |
+| 3:00-4:00 | 测试 + 跨机适配 | 219 单元 / 10 smoke / 4 P0 修复 |
 | 4:00-4:30 | 创新点 + 总结 | W14 H5 / get_lan_ip 国内适配 / _create_record 公共核 |
 | 4:30-5:00 | Q&A | |
 
@@ -478,9 +478,9 @@ def _create_record(self, task_id, user_id, signin_method, match_score=None):
 **课程设计承诺**:
 - 源代码自研比例 ≈ 75% (≥ 70% 课程要求)
 - 第三方库使用 + API 参考 ≤ 25% (< 30% 限制)
-- 188 单元 + 8 smoke 测试全过
+- 219 单元 + 10 smoke 测试全过
 - 跨机可行性 4 P0 修复, 组员零环境也能跑
-- 完整 14 周迭代, 5 次 bug 审计, 76 commit
+- 完整 14 周迭代, 6 次 bug 审计, 101 commit (audit-round16 HEAD)
 - 所有 commit / blame 可追溯
 
 **项目交付完毕, 等待课程验收。**

@@ -1,8 +1,8 @@
 # 数据库设计
 
-> W2 初始 10 张表 + W4 加 2 张 (course_enrollment + login_attempt) = **12 张表**
+> W2 初始 10 张表 + W4 加 2 张 (course_enrollment + login_attempt) + W13+ 加 1 张 (task_signin_code) + W14+ 加 1 张 (course_teacher) = **14 张表**
 
-## 1. 12 张表概览
+## 1. 14 张表概览
 
 | 表 | 阶段 | 说明 |
 |---|---|---|
@@ -18,6 +18,8 @@
 | `lab_access_log` | W2 (W3 接入) | 准入日志 |
 | `course_enrollment` | **W4 加** | 选课名单 (替代 close_task fallback 走"role=student 全部") |
 | `login_attempt` | **W4 加** | 登录失败记录 (LOGIN_MAX_ATTEMPTS 防暴力) |
+| `task_signin_code` | **W13+ 加** | 数字码/二维码 token + TTL (对分易式手动触发码) |
+| `course_teacher` | **W14+ 加** | 课程-教师多对多中间表 (Q3=B schema 变更) |
 
 ## 2. ER 图
 
@@ -161,7 +163,7 @@ CREATE TABLE login_attempt (
 **W4 防暴力**: `auth_service.login` 登录失败时记 attempt;
 登录前查最近 `LOGIN_MAX_ATTEMPTS`(默认 5) 次失败次数, 超阈值抛 `账号已锁定`。
 
-## 4. 12 张表汇总 (CHARACTER SET utf8mb4)
+## 4. 14 张表汇总 (CHARACTER SET utf8mb4)
 
 ```
 1.  user (W2)
@@ -176,6 +178,8 @@ CREATE TABLE login_attempt (
 10. lab_access_log (W2, W3 接入)
 11. course_enrollment (W4 新)
 12. login_attempt (W4 新)
+13. task_signin_code (W13+ 新, 来自 migration_w13.sql)
+14. course_teacher (W14+ 新, 来自 migration_w14.sql)
 ```
 
 DDL 完整源码: [`db/schema.sql`](../db/schema.sql)
@@ -190,5 +194,7 @@ DDL 完整源码: [`db/schema.sql`](../db/schema.sql)
 - `lab.py` (LabTraining, LabAccessLog)
 - `course_enrollment.py` (CourseEnrollment, W4 加)
 - `login_attempt.py` (LoginAttempt, W4 加)
+- `task_signin_code.py` (TaskSigninCode, W13+ 加)
+- `course_teacher.py` (CourseTeacher, W14+ 加)
 
-**一致性**: schema 12 张 ↔ model 12 个 — 全部对应, W8 二次审计确认。
+**一致性**: schema 12 张 baseline + 2 张 W13+/W14+ migration = 14 张 ↔ model 10 文件 / 14 class — 全部对应, W8 二次审计确认 + W16 R16 audit 复测 OK。

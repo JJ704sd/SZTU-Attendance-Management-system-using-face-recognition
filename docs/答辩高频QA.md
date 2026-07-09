@@ -10,12 +10,12 @@
 
 | 指标 | 实际值 | 备注 |
 |---|---|---|
-| 表数量 | **13 张** | baseline 12 + W13+ task_signin_code;`db/schema.sql` 全文可查 |
-| 单元测试 | **193 项** | `pytest tests/ -v` ~60s 跑完;**PPT 写 136 是旧的** |
+| 表数量 | **14 张** | baseline 12 + W13+ task_signin_code + W14+ course_teacher;`db/schema.sql` 全文可查 |
+| 单元测试 | **219 项** | `pytest tests/ -v` ~67s 跑完,3 warning;**PPT 写 136 是旧的** |
 | 签到方式 | **3 种** | 刷脸(face)/ 数字码(digit)/ 二维码(qr),共用 `_create_record` 公共核 |
 | 实验室判定分支 | **7 种** | 6 拒绝 + 1 放行;`safety_level >= 4` 算高等级(**PPT 写"5 级"是简化**) |
 | 迭代阶段 | **5 个** | V1.0 登录 → V2.0 人脸 → V3.0 准入 → V4.0 打包 → V5.0 签到方式 |
-| Git commit | **83+** | `git log --oneline \| head -20` 可现场展示 |
+| Git commit | **101+** (audit-round16 HEAD) | `git log --oneline \| head -20` 可现场展示 |
 | PyInstaller 打包 | **380 MB** | onedir 模式,含 dlib 模型,双击即跑 |
 | 签到码 TTL | 默认 60s / **最长 600s(10 分钟)** | **PPT 写 300s 是错的**,代码 `attendance_service.py:42` |
 | bcrypt rounds | **12** | 每次哈希 ~250ms |
@@ -401,12 +401,12 @@ code_value = secrets.token_urlsafe(16)
 
 > 这些是 PPT 数据 vs 实际代码的偏差,老师很可能会问。**主动说"我们迭代中发现了真问题并修复"比假装完美加分得多**。
 
-### 坑 1:PPT 第 8 页写"136 单元测试",实际 193
+### 坑 1:PPT 第 8 页写"136 单元测试",实际 219
 
-- 实际:193 项,`pytest tests/ -v` ~60s 跑完
-- PPT 制作时间早于 W14/W15+ 加的 50+ 项测试(W14+ signin_web 11 + UI 现代化 10 + W15+ latest API 3 等)
+- 实际:219 项,`pytest tests/ -v` ~67s 跑完,3 warning
+- PPT 制作时间早于 W14/W15+/W16 加的 80+ 项测试(W14+ signin_web 11 + UI 现代化 10 + W15+ latest API 3 + W16+ _FaceCache 8 等)
 - **准备说辞**:现场 `pytest tests/ -v | tail -1` 跑给老师看
-- 分布:auth_service / face_helper / signin_methods(18) / signin_web(11) / ui_modern(10) / task_signin_code_dao(5) / latest_api(3,W15+)
+- 分布:auth_service / face_helper / signin_methods(18) / signin_web(11) / ui_modern(10) / task_signin_code_dao(5) / latest_api(3,W15+) / face_cache(8,W16+) / styles_modern / charts
 
 ### 坑 2:PPT 第 5 页写"TTL 最长 300s",实际 600s(10 分钟)
 
@@ -436,7 +436,7 @@ code_value = secrets.token_urlsafe(16)
 
 **安全方面**:bcrypt 12 rounds 慢哈希、login_attempt 表防爆破(5 次失败锁定)、SQLAlchemy ORM 全程防 SQL 注入、二维码 token 用 `secrets.token_urlsafe(16)` 128 bit 密码学安全随机 + 60 秒 TTL 覆盖式失效。
 
-**工程化**:**188 个单元测试 + 8 个 smoke 端到端全部通过**,PyInstaller 打包 380 MB 一键 exe。
+**工程化**:**219 个单元测试 + 10 个 smoke 端到端全部通过**,PyInstaller 打包 380 MB 一键 exe。
 
 **已完成 14 个迭代阶段 (W2-W15+)** V1.0 → V5.0,完整闭环。"
 

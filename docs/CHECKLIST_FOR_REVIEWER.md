@@ -31,7 +31,7 @@ python scripts\init_db.py
 
 | # | 步骤 | 命令 / 操作 | 期望 |
 |---|---|---|---|
-| 1 | **跑测试** | `pytest tests/ -q` | **188 passed in ~55s** |
+| 1 | **跑测试** | `pytest tests/ -q` | **219 passed in ~67s 3 warning** |
 | 2 | **跑 smoke** | `python scripts\smoke_full_flow.py` | OK, ~30s |
 | 3 | **启动 GUI** | `python -m src.main` | 登录窗口弹出, `app.log` 有"dlib 模型路径 OK" |
 | 4 | **刷脸签到** | 学生 test001 录人脸 → 教师 teacher01 发起任务 → 学生刷脸 | attendance_record 多 1 行 signin_method='face' |
@@ -72,9 +72,9 @@ python scripts\init_db.py
 
 1. **14 张表 + 19 FK + UNIQUE 约束** — 完整的数据建模, 不是 demo 级
 2. **3 种签到方式 + W14 多端登录** — 不是只刷脸, 是 4 种签到场景全覆盖
-3. **188 单元 + 8 smoke 端到端** — 自动化测试覆盖, 不是只跑通
-4. **5 次 bug 审计 + 跨机可行性体检** — 不是写完就交付, 反复修过
+3. **219 单元 + 10 smoke 端到端** — 自动化测试覆盖, 不是只跑通
+4. **6 次 bug 审计 + 跨机可行性体检** — 不是写完就交付, 反复修过
 5. **380 MB onedir 打包** — 真一键 exe, 不是只能 dev 跑
-6. **完整文档** (16 篇 .md) — 任何接手的人都能看懂, 不靠口口相传
+6. **完整文档** (29 篇 .md) — 任何接手的人都能看懂, 不靠口口相传
 
 **项目收尾 2026-06-17, 验收日 2026-06-20, 3 天缓冲。**

@@ -63,8 +63,8 @@
 [画面: VSCode 打开 src/, 4 个文件夹都点开看一下]
 
 旁白: "项目采用严格的 4 层架构 —
-      UI 层 (4 主窗口 + 14 widget) → Service 层 (6 业务逻辑) →
-      DAO 层 (13 个数据访问) → Model 层 (8 个 ORM + 14 张表)。
+      UI 层 (5 主窗口 + 13 widget) → Service 层 (7 业务逻辑) →
+      DAO 层 (15 个数据访问) → Model 层 (10 个 ORM + 14 张表)。
       严格自顶向下依赖, 禁止反向。"
 
 [画面: 切到 PyCharm / VSCode 左侧文件树, 4 个文件夹依次高亮]
@@ -282,20 +282,20 @@
 ```
 [画面: 切到 IDE 终端]
 
-旁白: "项目共 188 单元测试 + 8 smoke 端到端, 全部通过。"
+旁白: "项目共 219 单元测试 + 10 smoke 端到端, 全部通过。"
 
 [操作: 跑 pytest]
 
 $ pytest tests/ -v
-========================= 188 passed in 55.34s =========================
+========================= 219 passed in 60.34s =========================
 
-旁白: "8 个 smoke 脚本, 端到端验证完整业务流、UI 交互、打包后端到端。"
+旁白: "10 个 smoke 脚本, 端到端验证完整业务流、UI 交互、打包后端到端。"
 
-[操作: 跑 8 个 smoke 脚本, 8/8 PASS]
+[操作: 跑 10 个 smoke 脚本, 10/10 PASS]
 
 $ python scripts/smoke_full_flow.py
 ✓ All checks passed
-... 8 个 smoke 全过
+... 10 个 smoke 全过
 ```
 
 ### 6.2 跨机可行性
@@ -325,12 +325,12 @@ $ python scripts/smoke_full_flow.py
 ```
 [画面: 浏览器打开 GitHub 仓库]
 
-旁白: "完整项目在 GitHub 上, 76 个 commit, 149 文件, 988.6 KB,
+旁白: "完整项目在 GitHub 上, 101 个 commit (audit-round16 HEAD), 149 文件, 988.6 KB,
       完整迭代 14 周 (W2-W15+)。"
 
 [操作: 切到 GitHub 仓库, 展示 commit 列表]
 
-旁白: "5 次 bug 审计, 36 真 bug 修复, 全部在 commit 中可追溯。
+旁白: "6 次 bug 审计, 36 真 bug 修复, 全部在 commit 中可追溯。
       5 份 docs/ + 3 份 superpowers plans/ + 5 份 submission/ 文档完整。"
 
 [操作: 切到仓库文档结构]
@@ -349,7 +349,7 @@ $ python scripts/smoke_full_flow.py
 
 旁白: "以上就是 '智能考勤与实验室准入系统' 的全部演示。
       项目实现 3 种签到方式 + W14 多端登录 + 跨机可行性 4 P0 修复,
-      188 单元 + 8 smoke 全过, 5 次 bug 审计 36 真 bug。
+      219 单元 + 10 smoke 全过, 6 次 bug 审计 36 真 bug。
       感谢 [老师姓名] 老师指导, 感谢 [组员] 团队的努力。
       课程设计结束, 谢谢大家!"
 
@@ -369,7 +369,7 @@ $ python scripts/smoke_full_flow.py
 - 清空某学生的人脸数据 (W12 加)
 - 学生自己清人脸 (W12 加)
 
-### 9.3 5 次 bug 审计
+### 9.3 6 次 bug 审计
 - W7-W12 36 真 bug 列表
 - 演示每个 bug 修复前/后的差异
 
@@ -446,11 +446,11 @@ W14 多端登录 —— 手机扫码 H5 签到, FastAPI 嵌入 PyQt 进程, 教�
 
 9
 00:04:40,000 --> 00:05:30,000
-188 单元 + 8 smoke 全过, 跨机可行性 4 P0 修复。
+219 单元 + 10 smoke 全过, 跨机可行性 4 P0 修复。
 
 10
 00:05:30,000 --> 00:06:00,000
-GitHub 76 commit 完整迭代, 5 次 bug 审计 36 真 bug。
+GitHub 101 commit (audit-round16 HEAD) 完整迭代, 6 次 bug 审计 36 真 bug。
 ```
 
 ---
@@ -488,7 +488,7 @@ GitHub 76 commit 完整迭代, 5 次 bug 审计 36 真 bug。
 - 失败时切换到 SQLite 演示 (`config.py` 改 DATABASE_URL)
 
 ### 13.4 PyQt 崩溃
-- 失败时切换到 smoke 脚本输出 (188/188 passed)
+- 失败时切换到 smoke 脚本输出 (219/219 passed)
 
 ### 13.5 FastAPI 启动失败
 - 失败时切换到电脑摄像头二维码签到演示 (W14 是进阶功能)

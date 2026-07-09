@@ -45,7 +45,7 @@
 - **3 角色一体化**：学生刷脸签到 / 教师发起考勤 / 管理员管实验室
 - **考勤 + 准入双场景**：考勤用刷脸 / 数字码 / 二维码；准入要过培训关
 - **数据持久化**：14 张表 / utf8mb4 / bcrypt 密码哈希 / SQLAlchemy ORM
-- **桌面端一键 exe**：PyInstaller onedir 打包 ≈396 MB（带 W14 FastAPI 嵌入）
+- **桌面端一键 exe**：PyInstaller onedir 打包 ≈380 MB（带 W14 FastAPI 嵌入）
 
 **截图需求**: 三大窗口总览拼图（参考 `dataset/screenshots/` 或实拍）
 
@@ -53,11 +53,11 @@
 
 ## P4. 系统架构（4 层）
 **要点**:
-- `ui/` → PyQt5 窗口（login/register/student/teacher/admin + 11 widget）
+- `ui/` → PyQt5 窗口（login/register/student/teacher/admin + 13 widget）
 - `services/` → 业务逻辑（auth/attendance/face/lab_access/leave/report/signin_web 7 个）
-- `dao/` → SQLAlchemy 数据访问（13 个）
-- `models/` → ORM 模型（14 张表）
-- `utils/` → crypto/face_helper/network/charts/paths
+- `dao/` → SQLAlchemy 数据访问（15 个）
+- `models/` → ORM 模型（10 个文件，14 个 class 覆盖 14 张表）
+- `utils/` → crypto/face_helper/network/charts/paths/report_dto
 
 **讲法**: 自顶向下依赖图（严格禁止反向），service 用 `session_scope()` 自动 commit
 
@@ -203,16 +203,17 @@
 
 ## P14. 测试矩阵
 **要点**:
-- 单元测试：**193/193** 全过，~55s 4 warning
-- Smoke 脚本：**9 个** 全过
+- 单元测试：**219/219** 全过，~67s 3 warning
+- Smoke 脚本：**10 个** 全过
   - `smoke_full_flow.py` 9 步业务流
   - `smoke_signin_web.py` 9 步 W14 全链路
   - `smoke_qrcode_build.py` + `smoke_signin_web_build.py` 防 hiddenimports 漏配
+  - `smoke_full_regression.py` 6 service + 13 dao 全公开方法
   - `smoke_real_face.py` / `smoke_signin_methods.py` / `smoke_audit_history.py` / `smoke_ui_qtest.py` / `smoke_e2e.py`
-- PyInstaller onedir exe：`dist/attendance-system/` 总 **396 MB**（含 W14 FastAPI 嵌入）
+- PyInstaller onedir exe：`dist/attendance-system/` 总 **380 MB**（含 W14 FastAPI 嵌入）
 
 **截图需求**:
-- [ ] pytest 终端 193 passed 截图
+- [ ] pytest 终端 219 passed 截图
 - [ ] smoke_signin_web 9 步全过截图
 - [ ] dist/attendance-system/ 文件夹大小截图
 
@@ -221,7 +222,7 @@
 ## P15. 总结 + 致谢
 **要点**:
 - 完成情况：W2-W15+ 全 14 周迭代，覆盖登录/考勤/实验室/请假/统计/H5 签到
-- 数据规模：14 张表 + 193 单元测试 + 9 smoke 脚本 + 396 MB exe
+- 数据规模：14 张表 + 219 单元测试 + 10 smoke 脚本 + 380 MB exe
 - 可改进点：实验室 IoT 集成 / 微信扫码（需企业认证）
 - 致谢：指导老师 + 团队成员
 
@@ -246,7 +247,7 @@
 
 - **开头 30 秒**: "我们做的不是一个简单的考勤系统，而是把考勤 + 实验室准入 + 安全培训三个场景整合到一起的桌面应用"
 - **W14 重点**: "W14 我们加了多端登录 — 学生不用电脑也能签到，这是答辩的差异化亮点"
-- **结尾**: "我们完整跑了 13 周迭代，193 单元测试 + 8 个 smoke 全过，欢迎老师提问"
+- **结尾**: "我们完整跑了 13 周迭代，219 单元测试 + 10 个 smoke 全过，欢迎老师提问"
 
 ---
 

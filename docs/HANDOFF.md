@@ -15,12 +15,12 @@
 | **栈** | Python 3.10+ (推荐 3.13.x) + PyQt5 5.15 + MySQL 8.0.29+ + dlib-bin 20.0.1 + SQLAlchemy 2.0 |
 | **架构** | 4 层 (ui → service → dao → model) + utils |
 | **数据** | **14 张表** (schema.sql 12 + migration_w13.sql 1 + migration_w14.sql 1) |
-| **代码** | **107 个 .py** / 6 service / 14 widget / 4 主窗口 |
-| **测试** | **193 单元 / 8 smoke 端到端**（全过 ~60s） |
+| **代码** | **110 个 .py** (66 src + 27 tests + 17 scripts) / 7 service / 13 widget / 5 主窗口 |
+| **测试** | **219 单元 / 10 smoke 端到端**（全过 ~67s 3 warning — 1 fastapi/testclient + 1 starlette + 1 websockets 第三方库 deprecation） |
 | **打包** | PyInstaller onedir **~380 MB** |
 | **3 种签到** | 刷脸 (dlib 距离匹配) / 数字码 (对分易式 60s 倒计时) / 二维码 (base64 token) |
 | **W14+ 新功能** | FastAPI 嵌入 + H5 签到页 (手机扫码 → 浏览器 → 教师端实时反馈) |
-| **迭代** | W2 → W15+, 共 14 周, 73 commit, 5 次 bug 审计 + 跨机可行性体检 |
+| **迭代** | W2 → W15+, 共 14 周, **101 commit** (audit-round16 HEAD), 6 次 bug 审计 (W7/W8/W9/W10/W11/W12) + W14 收尾 + W15+ 跨机可行性体检 |
 
 ## 2. 你应该读哪一篇？
 
@@ -30,7 +30,7 @@
 | **老师 / 验收人**（5 分钟看完） | 本文档 § 6「10 步验收」 | 每个勾打上即可 |
 | **答辩演示人**（录视频 + 答辩） | [docs/TESTING_CHECKLIST.md](TESTING_CHECKLIST.md) + [submission/04_DEMO_VIDEO_SCRIPT.md](../submission/04_DEMO_VIDEO_SCRIPT.md) | 10 步 + 录屏脚本 |
 | **半年后的自己**（接手维护） | 本文档 + [CLAUDE.md](../CLAUDE.md) | 仓库结构 + 4 层依赖 |
-| **想跑通 193 项测试** | [README.md § 验收](../README.md#验收) | 8 个 smoke 命令 |
+| **想跑通 219 项测试** | [README.md § 验收](../README.md#验收) | 10 个 smoke 命令 |
 | **想打 .exe** | [README.md § 关键技术决策](../README.md#关键技术决策) + `build.spec` | onedir 模式说明 |
 
 ## 3. 仓库结构（一图看全）
@@ -50,7 +50,7 @@ Attendance-Management-system-using-face-recognition/  ← 你解压后看到的
 │   ├── main.py                    ← 应用入口 (python -m src.main)
 │   ├── config.py                  ← 全局配置 (读 .env)
 │   ├── db.py                      ← SQLAlchemy engine + session_scope
-│   ├── ui/                        ← PyQt5 窗口 (4 主窗口 + 13 widget)
+│   ├── ui/                        ← PyQt5 窗口 (5 主窗口 + 13 widget)
 │   │   ├── login_window.py        ← 登录 (3 角色路由)
 │   │   ├── register_window.py     ← 注册
 │   │   ├── student_window.py      ← 学生端 (4 Tab: 人脸注册/签到/考勤/请假)
@@ -58,7 +58,7 @@ Attendance-Management-system-using-face-recognition/  ← 你解压后看到的
 │   │   ├── admin_window.py        ← 管理员端 (5 Tab: 实验室/培训/准入日志/报表/人脸)
 │   │   ├── styles.py              ← 全局 QSS + design tokens
 │   │   └── widgets/                ← 13 子控件
-│   ├── services/                  ← 业务逻辑 (6 个)
+│   ├── services/                  ← 业务逻辑 (7 个)
 │   │   ├── auth_service.py        ← 注册/登录/改密
 │   │   ├── attendance_service.py  ← 3 种签到方式统一公共核 (_create_record)
 │   │   ├── face_service.py        ← 人脸识别 + 采集
@@ -66,14 +66,15 @@ Attendance-Management-system-using-face-recognition/  ← 你解压后看到的
 │   │   ├── leave_service.py       ← 请假申请/审批
 │   │   ├── report_service.py      ← 4 类统计报表
 │   │   └── signin_web.py          ← W14 FastAPI 嵌入 (H5 签到)
-│   ├── dao/                       ← SQLAlchemy 数据访问 (12 个)
-│   ├── models/                    ← ORM 模型 (8 个, 4 张表无 ORM 走纯 SQL)
+│   ├── dao/                       ← SQLAlchemy 数据访问 (15 个)
+│   ├── models/                    ← ORM 模型 (10 个, 14 个 class 覆盖 14 张表, 全部走 ORM)
 │   └── utils/                     ← 工具层
 │       ├── crypto.py              ← bcrypt 哈希
 │       ├── face_helper.py         ← dlib 4 核心 API (face_locations/encodings/distance/compare_faces)
 │       ├── charts.py              ← matplotlib 4 类图表
 │       ├── paths.py               ← APP_ROOT 单例 (PyInstaller 兼容)
-│       └── network.py             ← LAN IP 探测 (W15+ 改阿里 DNS)
+│       ├── network.py             ← LAN IP 探测 (W15+ 改阿里 DNS)
+│       └── report_dto.py          ← W16+ 拆出, 解 utils→services 反向依赖 (c11d4c2)
 │
 ├── db/                            ← **数据库 DDL**
 │   ├── schema.sql                 ← 12 张表 baseline
@@ -90,15 +91,16 @@ Attendance-Management-system-using-face-recognition/  ← 你解压后看到的
 │   ├── W14-defense-outline.md     ← 答辩 PPT 大纲
 │   └── superpowers/plans/         ← 6 份 W3-W14 实施计划
 │
-├── scripts/                       ← **运维 + 烟测** (12 个)
+├── scripts/                       ← **运维 + 烟测** (17 个, 含 10 smoke)
 │   ├── init_db.py                 ← ⭐ 一键建 14 张表 (跨机适配修过)
 │   ├── run_dev.sh / .bat          ← 开发模式启动
 │   ├── seed_demo_data.py          ← 演示数据 seed
 │   ├── cleanup_test_users.py      ← 清理测试用户
-│   ├── smoke_*.py                 ← 7 个端到端烟测
+│   ├── smoke_*.py                 ← 10 个端到端烟测 (full_flow / real_face / ui_qtest / e2e / signin_methods / audit_history / full_regression / qrcode_build / signin_web / signin_web_build)
+│   ├── build_2_zips.py / prepare_deliverable_zip.py ← W15+ 课程交付物打包
 │   └── import_schedule.py         ← 课表导入 (W14+)
 │
-├── tests/                         ← **单元测试** (188 项, pytest)
+├── tests/                         ← **单元测试** (219 项, pytest)
 │   ├── conftest.py                ← session 级自动清理 fixture
 │   ├── test_*.py                  ← 按模块覆盖
 │
@@ -141,7 +143,7 @@ python -m src.main
 | bcrypt 而非明文 | 课程要求"密码不能明文" |
 | SQLAlchemy 2.0 ORM | 防 SQL 注入 + 跨数据库可移植（演示可一键切 SQLite） |
 | `face encoding` 统一 `np.float32` | 序列化/比对链路不会再因量纲不一致出错，有 `test_face_encodings_dtype_is_float32` 锁住 |
-| PyQt5 而非 Tkinter | 控件丰富，4 个主窗口有大量表格 + 表单 |
+| PyQt5 而非 Tkinter | 控件丰富，5 个主窗口有大量表格 + 表单 |
 | `src/utils/paths.py::APP_ROOT` 单例 | dev 走 `Path(__file__).resolve().parent.parent.parent`；打包后走 `Path(sys.executable).resolve().parent` |
 | W14 FastAPI 嵌入 PyQt 进程（不独立跑） | 独立 uvicorn 进程需要管端口/启停/跟 GUI 生命周期对齐；改用 `uvicorn.Server` + `threading.Thread(daemon=True)` |
 
@@ -160,7 +162,7 @@ python -m src.main
 | 6 | **二维码签到**: 教师弹码 → 学生扫 → 出勤 | attendance_record 多一行 signin_method='qr' | ☐ |
 | 7 | **手机扫码 H5**: 教师点"二维码签到" → 手机浏览器打开 H5 → 提交 | attendance_record 多一行 signin_method='qr' (从手机来) | ☐ |
 | 8 | **关闭任务**: 教师点"结束选中任务" | 没签到的学生自动 absent, 请过假的变 leave | ☐ |
-| 9 | **自动化测试**: `pytest tests/ -q` | 193 passed in ~60s | ☐ |
+| 9 | **自动化测试**: `pytest tests/ -q` | 219 passed in ~67s 3 warning | ☐ |
 
 详细手机扫码步骤 + 防火墙授权 + 故障排除见 [docs/TESTING_CHECKLIST.md](TESTING_CHECKLIST.md)。
 
@@ -168,12 +170,12 @@ python -m src.main
 
 | 指标 | 数据 |
 |---|---|
-| Git commit 数 | 83 (W2 → W15+) |
-| 入库文件数 | 147 (107 .py + 23 .md + 5 .sql + 12 .bat/.spec/.template) |
+| Git commit 数 | **101** (W2 → audit-round16 HEAD, 含 6 次 bug 审计 + W12 P0 + W14 收尾 + W15+ 跨机可行性 + W16 docs/arch 联审) |
+| 入库文件数 | **149** (110 .py + 29 .md + 3 .sql + 4 .bat/.spec + 3 submission) |
 | 入库代码大小 | ~970 KB (压缩后 ~400 KB) |
-| 测试覆盖 | 193 单元 / 8 smoke 端到端 / 7 warning（3 个 starlette/websockets/uvicorn 第三方库 deprecation） |
+| 测试覆盖 | **219 单元 / 10 smoke 端到端 / 3 warning**（fastapi/testclient + starlette + websockets 第三方库 deprecation） |
 | 迭代周数 | 14 周 (W2 / W3 / W4 / W5 / W6 / W7 / W8 / W9 / W10 / W11 / W12 / W13+ / W14 / W15+) |
-| Bug 审计次数 | 5 次 (W7/W8/W9/W10/W11) + W12 P0 验收 + W14 收尾 + W15+ 跨机可行性 |
+| Bug 审计次数 | **6 次** (W7/W8/W9/W10/W11/W12) + W14 收尾 + W15+ 跨机可行性 + W16 docs/arch/UI 联审 |
 | 跨机可行性 P0 数 | 0 (4 修 + 5 P1 修 + 3 改进) |
 
 ## 8. 已知约束（项目层面接受，不动）
@@ -204,10 +206,10 @@ python -m src.main
 
 1. **先读 [CLAUDE.md](../CLAUDE.md)** — 3 分钟了解架构 + 决策 + 坑
 2. **跑 `pytest tests/ -q`** — 5 分钟验证环境
-3. **跑 8 个 smoke** — 10 分钟验证业务流
+3. **跑 10 个 smoke** — 10 分钟验证业务流
 4. **看 `src/` 4 层代码 + `src/ui/styles.py`** — 30 分钟理解 4 层依赖（ui→service→dao→model 严格自顶向下）
 5. **看 [docs/superpowers/plans/](superpowers/plans/)** — 6 份 W3-W14 实施计划，看迭代过程
-6. **改任何代码前先跑测试** — 193 项测试覆盖了主要业务流
+6. **改任何代码前先跑测试** — 219 项测试覆盖了主要业务流
 
 **如果遇到"代码改完测试挂了"**:
 - 先看 `git log -p` 最近几个 commit 的 diff

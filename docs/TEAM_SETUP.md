@@ -7,7 +7,7 @@
 
 | 工具 | 版本 | 验证命令 | 备注 |
 |---|---|---|---|
-| **Python** | **3.10+**（推荐 3.13.x） | `python --version` | 项目代码用 PEP 604 `X \| None` 语法（需 3.10+）；dlib-bin 20.0.1 在 PyPI 有 cp311/cp312/cp313 三个 wheel，3.11/3.12 理论能跑。**3.13.x 是远端 CI 全程验证的版本**，193 单元 + 8 smoke 全过 |
+| **Python** | **3.10+**（推荐 3.13.x） | `python --version` | 项目代码用 PEP 604 `X \| None` 语法（需 3.10+）；dlib-bin 20.0.1 在 PyPI 有 cp311/cp312/cp313 三个 wheel，3.11/3.12 理论能跑。**3.13.x 是远端 CI 全程验证的版本**，219 单元 + 10 smoke 全过 |
 | **MySQL** | **8.0.29+**（**必须**） | `mysql --version` | migration 用 `IF NOT EXISTS` 语法，5.7 / 8.0.28- 不支持；启动 `mysqld` 服务, root 密码记住 |
 | **Git** | 任意 | `git --version` | 拉项目用 |
 | **Webcam** | 任意 USB / 内置 | (无) | 仅"刷脸签到"需要, 数字码 / 二维码不依赖 |
@@ -178,16 +178,16 @@ python scripts\seed_demo_data.py
 ## 6. 跑测试（验证环境 OK）
 
 ```powershell
-# 全测 (188 项 / ~55s / 7 warnings — 全部是 starlette/websockets 库 deprecation, 与本项目无关)
+# 全测 (219 项 / ~67s / 3 warnings — fastapi/testclient + starlette + websockets 第三方库 deprecation, 与本项目无关)
 python -m pytest tests/ -q
 
 # 期望结尾:
-# 188 passed in ~55s
+# 219 passed in ~60s
 ```
 
 若失败先看 [故障排除](#故障排除)。
 
-**8 个 smoke 端到端脚本**（更接近真实用户行为）：
+**10 个 smoke 端到端脚本**（更接近真实用户行为）：
 
 ```powershell
 python scripts\smoke_full_flow.py            # 完整业务流 (W6)
@@ -197,6 +197,7 @@ python scripts\smoke_e2e.py                  # 打包后端到端 (W5)
 python scripts\smoke_signin_methods.py       # W13+ 数字码 + 二维码签到
 python scripts\smoke_audit_history.py        # W7-W12 历史修复回归 (16/16 OK)
 python scripts\smoke_full_regression.py      # 6 service + 13 dao 全公开方法 (~30 项)
+python scripts\smoke_qrcode_build.py         # W14+ 防 hiddenimports 漏配 (二维码)
 python scripts\smoke_signin_web.py           # W14 H5 多端签到 (9 步)
 python scripts\smoke_signin_web_build.py     # W14 H5 打包验证
 ```
@@ -281,11 +282,11 @@ python -m src.main                             # 验证 GUI 起来
 
 - **架构**：4 层 (ui → service → dao → model) + utils
 - **14 张表** (schema.sql 12 + migration_w13.sql 1 + migration_w14.sql 1)
-- **6 个 service** / **14 个 widget** / **4 个主窗口** (login / register / student / teacher / admin)
+- **7 个 service** / **13 个 widget** / **5 个主窗口** (login / register / student / teacher / admin)
 - **3 种签到方式**：刷脸 / 数字码 (对分易式 60s 倒计时) / 二维码 (base64 token)
 - **W14 多端登录签到**：FastAPI 嵌入 + H5 签到页 (手机扫码 → 浏览器 → 教师端实时反馈)
 - **依赖**：PyQt5 + SQLAlchemy 2.0 + dlib-bin + opencv + bcrypt + qrcode + fastapi + uvicorn + jinja2 + httpx
-- **测试**：193 单元 + 8 smoke
+- **测试**：219 单元 + 10 smoke
 - **打包**：PyInstaller onedir 380 MB
 
 详细看 [README.md](../README.md) + [CLAUDE.md](../CLAUDE.md) + [docs/SIGNIN_METHODS.md](SIGNIN_METHODS.md) + [docs/TESTING_CHECKLIST.md](TESTING_CHECKLIST.md)；smoke 用法见 [README.md § 验收](../README.md#验收)。
