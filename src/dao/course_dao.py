@@ -1,7 +1,15 @@
 """
 dao/course_dao.py — 课程 DAO
+
+R16 清理: 删孤儿 find_by_code (返回类型错 + 无任何调用方)。
+  原因:
+    - 类型签名写 `-> List[Course]` 但实际 `.first()` 返回 Optional[Course]
+      是误导, 后人调用必须包 try/except, 易踩坑。
+    - 全代码库 (services + scripts + tests) 没有任何调用方, 仅死代码。
+  真要用按 code 查单门课, 直接 CourseDao(s).s.query(Course)
+  .filter(Course.course_code == code).first() 即可, 一行不需要包装。
 """
-from typing import List, Optional
+from typing import List
 
 from sqlalchemy import or_
 
@@ -12,9 +20,6 @@ from src.models.course_teacher import CourseTeacher
 
 class CourseDao(BaseDao[Course]):
     model = Course
-
-    def find_by_code(self, code: str) -> List[Course]:
-        return self.s.query(Course).filter(Course.course_code == code).first()
 
     def find_by_teacher(self, teacher_id: int) -> List[Course]:
         """某老师授/助的所有课程（W14+ 同时查 ``Course.teacher_id`` 和关联表）。

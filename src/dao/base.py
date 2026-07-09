@@ -1,5 +1,10 @@
 """
 dao/base.py — DAO 基类，封装通用 CRUD
+
+R16 清理: 删孤儿方法 commit/rollback。
+  原因: 全代码库 (services + scripts) 都用 session_scope() 自动
+  commit/rollback, 没人调 dao.commit()/rollback()。保留只会误导
+  后人以为 DAO 自管事务, 实际调用方应全程依赖 session_scope 上下文。
 """
 from typing import TypeVar, Generic, Type, Optional, List
 from sqlalchemy.orm import Session
@@ -33,9 +38,3 @@ class BaseDao(Generic[T]):
 
     def delete(self, obj: T):
         self.s.delete(obj)
-
-    def commit(self):
-        self.s.commit()
-
-    def rollback(self):
-        self.s.rollback()
