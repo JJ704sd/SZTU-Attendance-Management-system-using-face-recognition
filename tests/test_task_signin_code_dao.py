@@ -174,6 +174,54 @@ def test_find_active_by_value_filters_wrong_value(open_task):
         assert found is None
 
 
+def test_find_active_by_value_combo_filter_all_conditions(open_task):
+    """R16: 多条件组合过滤 — find_active_by_value 同时校验 5 个条件。
+
+    已有测试各自覆盖单个条件 (filters_wrong_value / filters_expired /
+    filters_inactive / insert_new_and_get), 但没测「组合」:
+    - 同 task 多个 type, 查其中一个 type 应只返该 type
+    - 同 type 多值, 查一个应只返该值
+    - 同 value 但 expired, 应返 None (即便其他条件对)
+    - 同 value 但 wrong task, 应返 None
+
+    这是学生端签到校验的核心多条件 SQL — 任何一条 false 应返 None,
+    防止「value 撞对但任务错」导致错签别的 task.
+    """
+    task_id = open_task
+    now = datetime.now()
+    with session_scope() as s:
+        dao = TaskSigninCodeDao(s)
+        # 写入一组: 1 个 active digit + 1 个 active qr + 1 个 expired digit
+        c_active_digit = dao.insert_new(task_id, "digit", "5555", now + timedelta(minutes=5))
+        c_active_qr = dao.insert_new(task_id, "qr", "tok_qq_xx", now + timedelta(minutes=5))
+        c_expired_digit = dao.insert_new(task_id, "digit", "6666", now - timedelta(seconds=1))
+        s.flush()
+        active_digit_id = c_active_digit.id
+        active_qr_id = c_active_qr.id
+
+    with session_scope() as s:
+        dao = TaskSigninCodeDao(s)
+
+        # 1) 全条件匹配 → 返 digit active
+        found = dao.find_active_by_value(task_id, "digit", "5555")
+        assert found is not None and found.id == active_digit_id
+
+        # 2) code_type 不匹配 (digit 查 qr value) → None
+        # 同 task + value 'tok_qq_xx' 但 type='digit' → 查不到
+        assert dao.find_active_by_value(task_id, "digit", "tok_qq_xx") is None
+
+        # 3) 全条件匹配 → 返 qr active
+        found_qr = dao.find_active_by_value(task_id, "qr", "tok_qq_xx")
+        assert found_qr is not None and found_qr.id == active_qr_id
+
+        # 4) value 撞但 expired → None (即 '6666' 存在 DB 里但因过期不命中)
+        assert dao.find_active_by_value(task_id, "digit", "6666") is None
+
+        # 5) value 撞但 task_id 错 → None (防「value 撞上但任务错」签别人 task)
+        wrong_task_id = task_id + 999_999
+        assert dao.find_active_by_value(wrong_task_id, "digit", "5555") is None
+
+
 def test_deactivate_active_for_task_type(open_task):
     """同任务同类型插 2 条，deactivate 一刀切返回 2，全部 is_active=0。"""
     task_id = open_task

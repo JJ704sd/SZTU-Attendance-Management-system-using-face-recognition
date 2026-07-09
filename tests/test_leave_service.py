@@ -197,6 +197,37 @@ def test_teacher_review_already_processed_raises(course_teacher_students):
         LeaveService().teacher_review(req.id, teacher.id, approve=False)
 
 
+def test_teacher_review_rejected_then_review_raises(course_teacher_students):
+    """R16: 已 rejected 的请假申请, 再 review 必须 raise (拒绝后也不能反悔)。
+
+    状态机:
+      pending --approve--> approved  → 再 review 应 raise (已有 test_teacher_review_already_processed_raises 覆盖)
+      pending --reject---> rejected  → 再 review 也应 raise (本测试补)
+      approved/rejected → 任何 transition 都 raise (统一语义)
+
+    实现是 `if req.status != "pending": raise LeaveError("...已处理")`,
+    不区分 approved 还是 rejected 都走同一 raise 分支。
+    """
+    course_id, teacher, (s1, _) = course_teacher_students
+    with session_scope() as s:
+        task_id = _create_open_task(s, course_id, teacher.id)
+
+    req = LeaveService().student_apply(s1.id, task_id, "不同意的原因")
+    # 第一次 review: 拒绝
+    LeaveService().teacher_review(req.id, teacher.id, approve=False, comment="理由不充分")
+
+    # 再 review (哪怕改成 approve) 必须 raise
+    with pytest.raises(LeaveError, match="已处理"):
+        LeaveService().teacher_review(req.id, teacher.id, approve=True)
+    with pytest.raises(LeaveError, match="已处理"):
+        LeaveService().teacher_review(req.id, teacher.id, approve=False)
+
+    # DB 状态应仍是 rejected (被 raise 拦截, 没二次写)
+    with session_scope() as s:
+        req2 = s.get(LeaveRequest, req.id)
+        assert req2.status == "rejected"
+
+
 def test_list_pending_for_task_returns_only_pending(course_teacher_students):
     course_id, teacher, (s1, s2) = course_teacher_students
     with session_scope() as s:
