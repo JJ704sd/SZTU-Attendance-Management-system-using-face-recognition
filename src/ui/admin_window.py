@@ -91,11 +91,15 @@ class AdminWindow(QWidget):
         self.setLayout(main)
 
     def closeEvent(self, event):
-        """用户点 X 关窗时调用, 关闭可能打开的弹窗 (matplotlib canvas 等)."""
-        for attr in ("task_detail_win", "lab_edit_win", "training_edit_win", "log_filter_win"):
-            win = getattr(self, attr, None)
-            if win is not None and hasattr(win, "close"):
-                win.close()
+        """用户点 X 关窗时调用, Qt 会自动销毁所有子 widget (含 5 个 Tab +
+        matplotlib canvas).
+
+        R16 清理: 旧版 closeEvent 有 4 个 getattr 检查 (task_detail_win /
+        lab_edit_win / training_edit_win / log_filter_win), 但这些属性
+        从未在任何地方赋值 —— LabEditDialog / TrainingEditDialog 等都是
+        _on_add/_on_edit 内的局部变量 (dlg.exec_()), 不挂到 self.
+        getattr 永远返 None, 是死代码. 直接删掉, 靠 Qt 父子销毁链即可.
+        """
         super().closeEvent(event)
 
     def _on_logout(self):

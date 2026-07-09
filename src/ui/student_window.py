@@ -884,13 +884,13 @@ class StudentWindow(QWidget):
         if hasattr(self, "signin_camera") and self.signin_camera.is_running():
             self.signin_camera.stop()
         # W13+: 二维码子 Tab 的 timer + 独立 camera
+        # R16 修复: 走 QrScanWidget 的公开 API (cleanup_for_parent_close),
+        # 不再直接碰 _stop_scan_internal() 私有方法和 .camera 属性,
+        # 避免破坏 widget 封装. 子 widget 自己的 closeEvent 也会被父 close 链
+        # 触发, 这里只是"防御性 + 显式契约"的二次保证.
         if self._qr_widget is not None:
             try:
-                # 子 widget 自己的 closeEvent 已经在父 close 链里被调, 但显式再 stop 一次
-                # 保证 timer 一定停 (防御 Qt delete 顺序问题).
-                self._qr_widget._stop_scan_internal()
-                if self._qr_widget.camera.is_running():
-                    self._qr_widget.camera.stop()
+                self._qr_widget.cleanup_for_parent_close()
             except Exception:
                 log.exception("cleanup _qr_widget 异常")
 
