@@ -611,3 +611,157 @@ def test_signin_web_latest_404_when_no_live_token(client, open_task):
     data = resp.json()
     assert data["ok"] is False
     assert data["error"] == "NO_LIVE_TOKEN"
+
+
+# =====================================================
+# R16 修复: Pydantic 输入校验 + TemplateResponse 新 API + 全局异常处理
+# =====================================================
+def test_signin_web_post_payload_validation_long_password_returns_400(client, qr_token, student_user):
+    """R16: Pydantic 校验 password 超长 (>100 字符) → 400 BAD_REQUEST.
+
+    之前 raw dict 无校验, 1MB 字符串会触发 bcrypt 100ms 计算浪费资源,
+    也可能被用作资源耗尽攻击向量。Pydantic max_length=100 兜底拒绝。
+    """
+    resp = client.post("/api/signin", json={
+        "task_id":    qr_token["task_id"],
+        "token":      qr_token["token"],
+        "student_id": student_user.student_id,
+        "password":   "x" * 101,  # 超过 max_length=100
+    })
+    assert resp.status_code == 400, resp.text
+    data = resp.json()
+    assert data["ok"] is False
+    assert data["error"] == "BAD_REQUEST"
+    # 不暴露 Pydantic 内部路径 (信息泄露面), 只提示 field
+    assert "password" in data["msg"] or "参数不合法" in data["msg"]
+
+
+def test_signin_web_post_payload_validation_long_token_returns_400(client, qr_token, student_user):
+    """R16: Pydantic 校验 token 超长 (>64 字符) → 400 BAD_REQUEST.
+
+    二维码 token 由 secrets.token_urlsafe(16) 生成 = 22 字符,
+    64 字符上限已宽松 3 倍, 超长必是非法请求。
+    """
+    resp = client.post("/api/signin", json={
+        "task_id":    qr_token["task_id"],
+        "token":      "T" * 65,
+        "student_id": student_user.student_id,
+        "password":   "123456",
+    })
+    assert resp.status_code == 400, resp.text
+    assert resp.json()["error"] == "BAD_REQUEST"
+
+
+def test_signin_web_post_payload_validation_short_token_returns_400(client, qr_token, student_user):
+    """R16: Pydantic 校验 token 过短 (<8 字符) → 400 BAD_REQUEST.
+
+    防御: 防止 1-7 字符暴力枚举扫任务 (虽然 task_id 也限定)。
+    """
+    resp = client.post("/api/signin", json={
+        "task_id":    qr_token["task_id"],
+        "token":      "abc",  # < min_length=8
+        "student_id": student_user.student_id,
+        "password":   "123456",
+    })
+    assert resp.status_code == 400, resp.text
+    assert resp.json()["error"] == "BAD_REQUEST"
+
+
+def test_signin_web_post_payload_validation_negative_task_id_returns_400(client, qr_token, student_user):
+    """R16: Pydantic 校验 task_id 必须 >=1 → 400 BAD_REQUEST (不是 422).
+
+    与前端契约: 4xx = 业务错误, 5xx = 系统错误。所有校验失败统一 400。
+    """
+    resp = client.post("/api/signin", json={
+        "task_id":    -1,  # ge=1 拒绝
+        "token":      qr_token["token"],
+        "student_id": student_user.student_id,
+        "password":   "123456",
+    })
+    assert resp.status_code == 400, resp.text
+    assert resp.json()["error"] == "BAD_REQUEST"
+
+
+def test_signin_web_post_payload_validation_wrong_type_returns_400(client, qr_token, student_user):
+    """R16: Pydantic 校验 task_id 类型错 (string 不是 int) → 400 BAD_REQUEST."""
+    resp = client.post("/api/signin", json={
+        "task_id":    "not_an_int",
+        "token":      qr_token["token"],
+        "student_id": student_user.student_id,
+        "password":   "123456",
+    })
+    assert resp.status_code == 400, resp.text
+    assert resp.json()["error"] == "BAD_REQUEST"
+
+
+def test_signin_web_post_payload_validation_empty_student_id_returns_400(client, qr_token):
+    """R16: Pydantic 校验 student_id 空字符串 → 400 BAD_REQUEST."""
+    resp = client.post("/api/signin", json={
+        "task_id":    qr_token["task_id"],
+        "token":      qr_token["token"],
+        "student_id": "",
+        "password":   "123456",
+    })
+    assert resp.status_code == 400, resp.text
+    assert resp.json()["error"] == "BAD_REQUEST"
+
+
+def test_signin_web_html_no_deprecation_warning(client, qr_token, recwarn):
+    """R16: TemplateResponse 改新 API 后, 不再抛 starlette DeprecationWarning.
+
+    这是 P1-7 修复的回归保护: 一旦有人 revert 回 TemplateResponse(name, {...})
+    写法, 此测试立刻失败 (recwarn 抓 warning)。
+    """
+    import warnings
+    # 清空 pytest 自带的 recwarn 历史, 只看本次请求
+    recwarn.clear()
+    resp = client.get(f"/signin/{qr_token['task_id']}/{qr_token['token']}")
+    assert resp.status_code == 200, resp.text
+
+    # 过滤 starlette templating 的 DeprecationWarning
+    starlette_warnings = [
+        w for w in recwarn.list
+        if issubclass(w.category, DeprecationWarning)
+        and "templating" in str(w.filename).lower()
+    ]
+    assert len(starlette_warnings) == 0, (
+        f"TemplateResponse 仍抛 DeprecationWarning: "
+        f"{[str(w.message) for w in starlette_warnings]}"
+    )
+
+
+def test_signin_web_unhandled_exception_returns_500_internal(qr_token, student_user, monkeypatch):
+    """R16: 全局异常处理器 — 业务异常 → 500 INTERNAL, 不暴露 stack trace.
+
+    模拟 auth_service.login 抛 RuntimeError, 验证:
+      1. 返 500 状态码
+      2. body 是 {ok:false, error:"INTERNAL", msg:"服务异常，请重试"}
+      3. 响应体里不包含 "Traceback" / 文件路径等内部细节
+
+    注意: 用 raise_server_exceptions=False 让 starlette TestClient 把
+    server exception 转成 500 response (默认是 re-raise 给测试看到)。
+    """
+    from fastapi.testclient import TestClient
+    app = build_signin_app(qr_token["task_id"], qr_token["token"], qr_token["expires_at"])
+    test_client = TestClient(app, raise_server_exceptions=False)
+
+    def _boom(*args, **kwargs):
+        raise RuntimeError("simulated internal error: secret DB connection string leaked here")
+
+    from src.services import auth_service as auth_mod
+    monkeypatch.setattr(auth_mod.AuthService, "login", _boom)
+
+    resp = test_client.post("/api/signin", json={
+        "task_id":    qr_token["task_id"],
+        "token":      qr_token["token"],
+        "student_id": student_user.student_id,
+        "password":   "123456",
+    })
+    assert resp.status_code == 500, resp.text
+    data = resp.json()
+    assert data["ok"] is False
+    assert data["error"] == "INTERNAL"
+    # 不暴露内部细节
+    assert "Traceback" not in resp.text
+    assert "secret DB connection string" not in resp.text
+    assert ".py" not in resp.text  # 不暴露源码路径
