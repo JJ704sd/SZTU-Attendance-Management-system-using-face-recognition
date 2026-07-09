@@ -842,7 +842,7 @@ if lab.safety_level >= 4 and training.score < 90:
 - 这是 W13+ 重构的设计感,不是 3 套 if-else
 
 **219 单元测试 + 10 个 smoke 端到端**:
-- `pytest tests/ -v` 219/219 全过,~67s 跑完,3 warning (fastapi/testclient 1 + starlette 1 + websockets 1)
+- `pytest tests/ -v` 219/219 全过,~67s 跑完,2 warning (uvicorn 内部 websockets.legacy + WebSocketServerProtocol 第三方依赖 deprecation,非本项目代码)
 - 包含 dtype Lock / 死循环 Lock / H5 API 真实 HTTP 响应测试
 - smoke 端到端:full_flow / real_face / ui_qtest / e2e / signin_methods / audit_history / full_regression / qrcode_build / signin_web / signin_web_build
 

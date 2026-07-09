@@ -203,7 +203,7 @@
 
 ## P14. 测试矩阵
 **要点**:
-- 单元测试：**219/219** 全过，~67s 3 warning
+- 单元测试：**219/219** 全过，~67s 2 warning (uvicorn 内部)
 - Smoke 脚本：**10 个** 全过
   - `smoke_full_flow.py` 9 步业务流
   - `smoke_signin_web.py` 9 步 W14 全链路

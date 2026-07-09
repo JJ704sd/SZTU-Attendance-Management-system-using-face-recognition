@@ -178,7 +178,7 @@ python scripts\seed_demo_data.py
 ## 6. 跑测试（验证环境 OK）
 
 ```powershell
-# 全测 (219 项 / ~67s / 3 warnings — fastapi/testclient + starlette + websockets 第三方库 deprecation, 与本项目无关)
+# 全测 (219 项 / ~67s / 2 warnings — uvicorn 内部 websockets.legacy + WebSocketServerProtocol 第三方依赖 deprecation, 与本项目无关)
 python -m pytest tests/ -q
 
 # 期望结尾:
