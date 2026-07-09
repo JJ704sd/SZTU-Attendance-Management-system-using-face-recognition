@@ -127,7 +127,7 @@ record = svc.sign_in_by_digit(task_id=82, user_id=123, code_value="0427")
 |---|---|---|
 | `src/services/attendance_service.py` | 后端 | 抽公共核 + 三种签到方法 + 教师码生成 |
 | `src/dao/task_signin_code_dao.py` | 数据访问 | insert / find_active / deactivate |
-| `src/models/task_signin_code.py` | ORM | 13 张表新增 1 |
+| `src/models/task_signin_code.py` | ORM | W13+ 新增 task_signin_code 表 (13→14 张) |
 | `src/ui/widgets/signin_code_dialog.py` | 教师端弹窗 | QDialog + QTimer 倒计时 + qrcode 渲染 |
 | `src/ui/widgets/digit_signin_widget.py` | 学生端数字码 | QLineEdit (QIntValidator) + 提交按钮 |
 | `src/ui/widgets/qr_scan_widget.py` | 学生端二维码 | 复用 CameraWidget + cv2.QRCodeDetector |

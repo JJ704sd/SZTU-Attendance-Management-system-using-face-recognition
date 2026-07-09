@@ -251,3 +251,24 @@ class QrScanWidget(QWidget):
         self._stop_scan_internal()
         self._task_id = task_id
         self._set_status(f"已切换到任务 #{task_id}，点击「开始扫描」", "neutral")
+
+    def cleanup_for_parent_close(self):
+        """R16 公开 API: 父窗口 (StudentWindow) 关窗时显式调一次,
+        保证 timer + camera 一定停. 内部等价于 closeEvent 的清理,
+        但暴露给父 widget, 避免外部直接碰私有方法 (_stop_scan_internal)
+        和私有属性 (.camera). 父 closeEvent 已会触发本 widget closeEvent,
+        这里只是"防御性 + 显式契约"的二次保证.
+
+        边界:
+        - 安全可重入: 多次调用幂等, scan/camera 已停则 no-op
+        - 抛异常被吞: 不影响父 widget 关闭流程
+        """
+        try:
+            self._stop_scan_internal()
+        except Exception:
+            log.exception("QrScanWidget.cleanup_for_parent_close: _stop_scan_internal 异常")
+        try:
+            if self.camera is not None and self.camera.is_running():
+                self.camera.stop()
+        except Exception:
+            log.exception("QrScanWidget.cleanup_for_parent_close: camera.stop 异常")

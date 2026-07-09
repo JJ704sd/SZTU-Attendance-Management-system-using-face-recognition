@@ -56,9 +56,9 @@
 |---|---|---|
 | **4 层架构设计** | ui → service → dao → model 自顶向下, 严格依赖, 禁止反向 | `src/main.py` + `src/db.py` + `src/config.py` |
 | **14 张表 schema** | user/face_encoding/course/classroom/laboratory/attendance_task/attendance_record/leave_request/lab_training/lab_access_log/course_enrollment/login_attempt/task_signin_code/course_teacher | `db/schema.sql` + `db/migration_w13.sql` + `db/migration_w14.sql` |
-| **6 个 service** | 业务逻辑整合, 边界检查, 事务管理 | `src/services/auth_service.py` + `src/services/attendance_service.py` + `src/services/face_service.py` + `src/services/lab_access_service.py` + `src/services/leave_service.py` + `src/services/report_service.py` |
+| **7 个 service** | 业务逻辑整合, 边界检查, 事务管理 | `src/services/auth_service.py` + `src/services/attendance_service.py` + `src/services/face_service.py` + `src/services/lab_access_service.py` + `src/services/leave_service.py` + `src/services/report_service.py` + `src/services/signin_web.py` |
 | **W15+ 跨机可行性** | 4 P0 + 5 P1 修复 | `src/utils/network.py` + `scripts/init_db.py` + `docs/TEAM_SETUP.md` |
-| **5 次 bug 审计** | W7/W11/W12 主导 | 36 真 bug 修复 commit |
+| **6 次 bug 审计** | W7/W8/W9/W10/W11/W12 主导 | 36 真 bug 修复 commit |
 | **PyInstaller 打包** | onedir 380 MB | `build.spec` |
 | **项目文档** | 5 份 docs/ + 3 份 superpowers plans/ + 5 份 submission/ | `docs/*.md` + `docs/superpowers/plans/*.md` + `submission/*.md` |
 | **答辩准备** | PPT 框架 + 演示视频脚本 + 5 分钟陈述 | `submission/03_REPORT_PPT_OUTLINE.md` + `submission/04_DEMO_VIDEO_SCRIPT.md` |
@@ -174,8 +174,8 @@
 
 | 模块 | 负责内容 | 文件 |
 |---|---|---|
-| **188 单元测试** | pytest 8.x 单元测试 | `tests/test_*.py` |
-| **8 smoke 端到端** | full_flow / real_face / ui_qtest / e2e / signin_methods / audit_history / signin_web / full_regression | `scripts/smoke_*.py` |
+| **219 单元测试** | pytest 8.x 单元测试 | `tests/test_*.py` |
+| **10 smoke 端到端** | full_flow / real_face / ui_qtest / e2e / signin_methods / audit_history / full_regression / qrcode_build / signin_web / signin_web_build | `scripts/smoke_*.py` |
 | **conftest.py** | UUID 随机用户名 + cleanup_test_users | `tests/conftest.py` |
 | **test_face_helper.py** | dtype 锁 + 4 核心 API | `tests/test_face_helper.py` |
 | **test_auth_service.py** | 注册 / 登录 / 改密 / 错误路径 | `tests/test_auth_service.py` |
@@ -188,7 +188,7 @@
 **关键决策**:
 1. UUID 随机用户名 (test_auth_service.py, 避免冲突)
 2. autouse 清理 fixture (test_conftest.py)
-3. 8 smoke 端到端覆盖 (188 单元 + 8 smoke 双重保险)
+3. 10 smoke 端到端覆盖 (219 单元 + 10 smoke 双重保险)
 4. dtype 回归测试 (`test_face_encodings_dtype_is_float32`)
 5. collect_for_user 死循环回归测试 (W9 修)
 
@@ -220,7 +220,7 @@
 - **Git 仓库**: `https://github.com/JJ704sd/SZTU-Attendance-Management-system-using-face-recognition`
 - **分支策略**: 全员 main 分支直接推 (小组 4-5 人, 不需要 feature branch)
 - **commit 规范**: `<type>(<scope>): <subject>`, type = feat/fix/docs/test/refactor
-- **76 commit** 已推 main, 完整迭代
+- **main (94 commit) + R16 增 11 commit** (audit-round16 HEAD, 公式化) 已推, 完整迭代
 
 ### 5.2 会议节奏
 - **每周例会**: 周日 21:00 (线上腾讯会议), 1h, 同步进度 + 分配下周任务
@@ -230,13 +230,13 @@
 
 ### 5.3 文档协作
 - **组长** 负责整体文档 (5 份 docs/ + 5 份 submission/)
-- **组员 4** 负责测试文档 (188 单元 + 8 smoke)
+- **组员 4** 负责测试文档 (219 单元 + 10 smoke)
 - **所有 commit** 关联 docs/, 文档与代码同步
 
 ### 5.4 质量保证
 - **Code Review**: 互相看, 24h 内
 - **bug 审计**: 每周一次, 集中在 W7/W11/W12
-- **pytest**: 188/188 全过 (CI 未启用, 本地跑)
+- **pytest**: 219/219 全过 (CI 未启用, 本地跑)
 - **smoke**: 8/8 全过 (课程验收前跑一遍)
 
 ---
@@ -338,7 +338,7 @@
 
 ---
 
-—— 组员分工表完毕, 4-5 人, 14 周, 76 commit, 5 份 submission 文档
+—— 组员分工表完毕, 4-5 人, 14 周, main (94) + R16 增 11 commit (audit-round16 HEAD, 公式化), 5 份 submission 文档
 
 **本表配套材料**:
 - `submission/01_DESIGN_PROPOSAL.md` (整体设计)

@@ -608,7 +608,7 @@ model        (表 ↔ Python 类映射)
 
 **为什么 PyQt5**:
 1. **课程设计是桌面应用** + 摄像头需要本地访问(`cv2.VideoCapture(0)` 走系统 API)
-2. **PyQt5 控件丰富**:QTableWidget / QFormLayout / QMessageBox / 自定义 widget 4 个主窗口都用
+2. **PyQt5 控件丰富**:QTableWidget / QFormLayout / QMessageBox / 自定义 widget 5 个主窗口都用
 3. **摄像头本地**:`CameraWidget` 在工作线程跑 dlib,信号 `Qt.QueuedConnection` 跨线程更新 UI,延迟低
 4. **部署简单**:PyInstaller 打包一个 `.exe` 380 MB,双击就跑,不需要 Nginx / Node / 浏览器
 
@@ -841,10 +841,10 @@ if lab.safety_level >= 4 and training.score < 90:
 - 加新签到方式只需 +1 个薄方法,不动核心逻辑
 - 这是 W13+ 重构的设计感,不是 3 套 if-else
 
-**193 单元测试 + 6 个 smoke 端到端**:
-- `pytest tests/ -v` 193/193 全过,~60s 跑完
+**219 单元测试 + 10 个 smoke 端到端**:
+- `pytest tests/ -v` 219/219 全过,~67s 跑完,3 warning (fastapi/testclient 1 + starlette 1 + websockets 1)
 - 包含 dtype Lock / 死循环 Lock / H5 API 真实 HTTP 响应测试
-- smoke 端到端:full_flow / real_face / e2e / signin_methods / signin_web / audit_history
+- smoke 端到端:full_flow / real_face / ui_qtest / e2e / signin_methods / audit_history / full_regression / qrcode_build / signin_web / signin_web_build
 
 **W15+ 修过的 2 个真实 bug**:
 - H5 入口路由闭包 token 永远不匹配 DB live token(已修)
@@ -930,13 +930,13 @@ W8 修复:主窗口 `closeEvent` 调 `srv.should_exit = True` 同步停 FastAPI 
 
 `__exit__` 收到异常 → `session.rollback()` + `session.close()` + 不重抛(已抛的会继续向上传播)。业务代码块内 raise → 自动 rollback → 异常传到 UI 层 → QMessageBox 弹给用户。
 
-### S12. 193 个测试怎么组织的?覆盖率多少?
+### S12. 219 个测试怎么组织的?覆盖率多少?
 
-193 个 pytest 单元测试,~60s 跑完。分布:`test_auth_service` / `test_face_helper` / `test_signin_methods`(18)/ `test_signin_web`(11)/ `test_ui_modern`(10)/ `test_task_signin_code_dao`(5)/ `test_latest_api`(3,W15+)等。**没刻意追求覆盖率数字**,重点覆盖业务关键路径 + 回归锁。**注意 PPT 写 136 单元测试是旧的,实际 193**。
+219 个 pytest 单元测试,~60s 跑完。分布:`test_auth_service` / `test_face_helper` / `test_signin_methods`(18)/ `test_signin_web`(11)/ `test_ui_modern`(10)/ `test_task_signin_code_dao`(5)/ `test_latest_api`(3,W15+)/ `test_face_cache`(8,W16+)/ `test_styles_modern`(W15+)/ `test_charts`等。**没刻意追求覆盖率数字**,重点覆盖业务关键路径 + 回归锁。**注意 PPT 写 136 单元测试是旧的,实际 219**。
 
-### S13. 6 个 smoke 端到端分别是?
+### S13. 10 个 smoke 端到端分别是?
 
-`smoke_full_flow`(登录+签到完整链路)/ `smoke_real_face`(真实人脸测试)/ `smoke_ui_qtest`(UI 自动化)/ `smoke_e2e`(端到端)/ `smoke_signin_methods`(三种签到)/ `smoke_audit_history`(审计日志)/ `smoke_signin_web`(H5 签到,W14+)/ `smoke_signin_web_build`(PyInstaller 打包后 H5)。
+`smoke_full_flow`(登录+签到完整链路)/ `smoke_real_face`(真实人脸测试)/ `smoke_ui_qtest`(UI 自动化)/ `smoke_e2e`(端到端)/ `smoke_signin_methods`(三种签到)/ `smoke_audit_history`(审计日志)/ `smoke_full_regression`(6 service + 13 dao 全公开方法)/ `smoke_qrcode_build`(W14+ 防 hiddenimports 漏配)/ `smoke_signin_web`(H5 签到,W14+)/ `smoke_signin_web_build`(PyInstaller 打包后 H5)。
 
 ### S14. 为什么用 MySQL 不用 SQLite?
 
@@ -1002,12 +1002,12 @@ SQLAlchemy:`s.execute(text("INSERT INTO ..."), params)`。**代价**:失去 ORM 
 # 第三部分:答辩前 5 分钟快速检查清单
 
 - [ ] MySQL 服务开着,`.env` 配好 DB_PASSWORD
-- [ ] `python scripts/init_db.py` 跑过(12 张 baseline + W13/W14 迁移)
+- [ ] `python scripts/init_db.py` 跑过(12 张 baseline + W13/W14 迁移 = 14 张)
 - [ ] `python -m src.main` 能正常起 GUI(不段错误)
 - [ ] 测试账号:`test001/123456`(学生)、`teacher001/123456`(教师)
-- [ ] `pytest tests/ -v` 最后一行是 "188 passed"(**PPT 写 136 是错的,实际 193**)
+- [ ] `pytest tests/ -v` 最后一行是 "219 passed"(**PPT 写 136 是错的,实际 219**)
 - [ ] 答辩 PPT 9 页打开,投影正常
-- [ ] 准备好 `git log --oneline | head -20`(展示 83 个 commit)
+- [ ] 准备好 `git log --oneline | head -20`(展示 main 94 + R16 增 11 共 105, 或 `git rev-list HEAD --count` 实时数)
 - [ ] 准备好 `db/schema.sql` 全文(老师可能让你指出某张表)
 - [ ] 准备好 `src/services/attendance_service.py::_create_record` 代码(签到核心,Q4/Q10 高频)
 - [ ] 准备好 `attendance_record` 表结构和 UNIQUE 索引(Q4 高频)
@@ -1028,7 +1028,7 @@ SQLAlchemy:`s.execute(text("INSERT INTO ..."), params)`。**代价**:失去 ORM 
 
 **安全方面**:bcrypt 12 rounds 慢哈希、login_attempt 表防爆破(5 次失败锁定)、SQLAlchemy ORM 全程防 SQL 注入、二维码 token 用 `secrets.token_urlsafe(16)` 128 bit 密码学安全随机 + 60 秒 TTL 覆盖式失效。
 
-**工程化**:**188 个单元测试 + 6 个 smoke 端到端全部通过**,PyInstaller 打包 380 MB 一键 exe。
+**工程化**:**219 个单元测试 + 10 个 smoke 端到端全部通过**,PyInstaller 打包 380 MB 一键 exe。
 
 **已完成 14 个迭代阶段 (W2-W15+)** V1.0 → V5.0,完整闭环。"
 
@@ -1040,6 +1040,6 @@ SQLAlchemy:`s.execute(text("INSERT INTO ..."), params)`。**代价**:失去 ORM 
 2. **业务逻辑可以稍微弱**,代码细节不强求(老师一般不细看实现)
 3. **主动暴露不足**比"假装完美"加分 — Q25 准备好
 4. **老师追问 = 在乎你的项目**,不要慌
-5. **PPT 数据 vs 实际数据对不上**别回避:**实际 193 单元测试,PPT 制作时间早于 W14/W15+ 加测试**,现场 `pytest tests/ -v | tail -1` 跑给老师看
+5. **PPT 数据 vs 实际数据对不上**别回避:**实际 219 单元测试,PPT 制作时间早于 W14/W15+ 加测试**,现场 `pytest tests/ -v | tail -1` 跑给老师看
 6. **签到码最长 TTL 实际是 600s,PPT 写 300s 是错的**,主动纠正比被动发现好
 7. **W15+ 修过的 2 个真实 bug**(H5 入口路由闭包 token + H5 polling)说明项目有真实工程迭代,不是 demo

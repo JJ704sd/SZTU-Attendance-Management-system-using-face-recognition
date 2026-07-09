@@ -464,17 +464,25 @@ class TeacherWindow(QWidget):
     # 退出登录 / 关闭窗口
     # =====================================================
     def closeEvent(self, event):
-        """用户点 X 关窗时调用, 关闭可能打开的弹窗避免悬挂引用."""
-        # 关闭可能打开的请假审批弹窗 (W6 Phase 1 加的)
-        for attr in ("leave_review_win", "task_detail_win", "new_pwd_win"):
-            win = getattr(self, attr, None)
-            if win is not None and hasattr(win, "close"):
-                win.close()
+        """用户点 X 关窗时调用, 关闭可能打开的弹窗避免悬挂引用.
+
+        R16 清理: 旧版 closeEvent 有 3 个 getattr 检查 (leave_review_win /
+        task_detail_win / new_pwd_win), 但这 3 个属性从未在任何地方赋值:
+        - LeaveReviewDialog / TaskDetailDialog 是 _on_review_leave /
+          _on_view_detail 内的局部变量 (dlg.exec_()), 不挂 self
+        - new_pwd_win 是误传, 修改密码就是 Account Tab 内的 QPushButton 触发
+          (没有独立 dialog)
+        → getattr 永远返 None, 是死代码. 删掉, 只保留真正挂在 self 上
+        的 signin_code_win (数字码 / 二维码共用, 需主动关闭以释放端口).
+        """
         # W13+: 关闭可能打开的签到码弹窗（数字码 / 二维码共用同一个 widget）
-        for attr in ("signin_code_win",):
-            win = getattr(self, attr, None)
-            if win is not None and hasattr(win, "close"):
+        #       其 closeEvent 会同步停 web_server + polling timer, 端口释放.
+        win = getattr(self, "signin_code_win", None)
+        if win is not None and hasattr(win, "close"):
+            try:
                 win.close()
+            except Exception:
+                log.exception("closeEvent 关闭 signin_code_win 异常 (忽略)")
         super().closeEvent(event)
 
     def _on_logout(self):

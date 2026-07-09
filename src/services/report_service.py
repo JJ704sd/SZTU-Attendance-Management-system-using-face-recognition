@@ -12,7 +12,6 @@ late 算"出勤"是因为人到了（只是迟到）；absent 是没到；leave 
 """
 import logging
 from collections import defaultdict
-from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from typing import List, Optional
 
@@ -20,37 +19,14 @@ from src.dao.user_dao import UserDao
 from src.db import session_scope
 from src.models.attendance import AttendanceRecord, AttendanceTask
 from src.models.lab import LabAccessLog
-from src.models.user import User
+from src.utils.report_dto import (
+    AbsentWarning,
+    LabUsagePoint,
+    StudentRate,
+    TrendPoint,
+)
 
 log = logging.getLogger(__name__)
-
-
-@dataclass
-class StudentRate:
-    student_id: int
-    real_name: str
-    rate: float  # 0-1
-
-
-@dataclass
-class TrendPoint:
-    date: date
-    rate: float
-
-
-@dataclass
-class LabUsagePoint:
-    date: date
-    hour: int
-    count: int
-
-
-@dataclass
-class AbsentWarning:
-    student_id: int
-    real_name: str
-    rate: float
-    course_name: str  # "（全部课程）" 或具体课程名
 
 
 class ReportService:
@@ -156,10 +132,10 @@ class ReportService:
                 .all()
             )
 
-            per_dh: dict[tuple[date, int], int] = defaultdict(int)
-            for log in logs:
-                d = log.access_time.date()
-                h = log.access_time.hour
+            per_dh: dict = defaultdict(int)
+            for log_row in logs:
+                d = log_row.access_time.date()
+                h = log_row.access_time.hour
                 per_dh[(d, h)] += 1
 
             result = []

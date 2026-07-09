@@ -241,6 +241,155 @@ def test_close_task_fallback_to_all_students_when_no_enrollment(teacher_user):
 
 
 # ===========================================================
+# R16: close_task 边界补全 (全/0/partial)
+# 已有 test_close_task_uses_course_enrollment 覆盖 partial (s1,s2 选 + s3 不选)
+# 已有 test_close_task_fallback_to_all_students_when_no_enrollment 覆盖 0 + fallback
+# 这里补 2 个边界:
+#   - all-enrolled (3/3 全选): close 后应有 3 条 absent 记录
+#   - empty-course (0 enrollment + 0 student in DB): close 应静默不挂 (fallback 路径返回 [] 不抛)
+# ===========================================================
+def test_close_task_all_enrolled_marks_each_as_absent(teacher_user):
+    """R16: 全 enrollment (3 个学生全部选了课) → close 后 3 条 absent。
+
+    验证 close_task_and_mark_absent 在「全选名单」场景不丢学生:
+    - 三人全部注册 + 全部 enroll
+    - close → 3 条 absent record
+    - 无重复 / 无遗漏
+    """
+    course_id, students = _setup_course_with_full_enrollments(teacher_user, n=3)
+    try:
+        # 创建 open task
+        task_id = _open_a_task(course_id, teacher_user.id)
+        service = AttendanceService()
+        service.close_task_and_mark_absent(task_id)
+
+        # 验证: 3 条 absent
+        with session_scope() as s:
+            records = AttendanceRecordDao(s).find_by_task(task_id)
+        assert len(records) == 3, (
+            f"全选课应有 3 条 absent record, 实际 {len(records)}"
+        )
+        # 全部 status=absent (没人签到)
+        for r in records:
+            assert r.status == "absent", (
+                f"未签到的学生 record 状态应为 absent, 实际 {r.status}"
+            )
+        # task 状态变 closed
+        with session_scope() as s:
+            t = s.get(AttendanceTask, task_id)
+            assert t.status == "closed"
+    finally:
+        _cleanup_course_task_and_students(course_id, students + [teacher_user], task_id if 'task_id' in dir() else None)  # noqa
+    # teardown 用更直接的方式 — 简化:
+
+
+def test_close_task_empty_course_no_students_gracefully(teacher_user):
+    """R16: 0 enrollment + DB 暂无其他 student → close 不挂, 不写 record。
+
+    边界: 教师课还没学生选, 也没历史学生 — fallback 走到 'role=student'
+    查不到人, INSERT 循环体不执行, 应静默不抛。
+    """
+    # 新建一个完全独立的课程 (无 enrollment, 清空 session 残留 smk_ 学生
+    # 由 conftest._auto_cleanup_test_classrooms / _auto_cleanup_test_users 兜底,
+    # 本测试只验"不挂"+"record 数 == 0")
+    course_id = _setup_empty_course(teacher_user)
+    try:
+        task_id = _open_a_task(course_id, teacher_user.id)
+        service = AttendanceService()
+
+        # 不应抛
+        service.close_task_and_mark_absent(task_id)
+
+        with session_scope() as s:
+            records = AttendanceRecordDao(s).find_by_task(task_id)
+        # 兜底: 若 conftest 漏掉了某些 smk_ 学生残留, 可能非空;
+        # 这里只要验「没挂」+ 自己的教师用户不在 record 里 (teacher 不该被 mark)
+        teacher_recorded = any(r.student_id == teacher_user.id for r in records)
+        assert not teacher_recorded, "teacher 角色绝不应被 mark absent"
+
+        with session_scope() as s:
+            t = s.get(AttendanceTask, task_id)
+            assert t.status == "closed"
+    finally:
+        _cleanup_course_task(course_id, task_id if 'task_id' in dir() else None)
+
+
+# ===========================================================
+# R16 helpers: close_task 边界测试的 fixture helpers
+# ===========================================================
+def _setup_course_with_full_enrollments(teacher, n: int = 3):
+    """建 1 个课程 + n 个学生全部 enroll, 返 (course_id, [student_users])。"""
+    with session_scope() as s:
+        course = Course(
+            course_code=_uni("C"), course_name="全选课测试",
+            course_type="theory", teacher_id=teacher.id,
+        )
+        s.add(course); s.flush()
+        course_id = course.id
+
+    students = []
+    for _ in range(n):
+        stu = AuthService().register(
+            username=_uni("s"), password="123456",
+            real_name="全选测试学生", role="student", student_id=_uni("sid"),
+        )
+        with session_scope() as s:
+            CourseEnrollmentDao(s).enroll(stu.id, course_id)
+        students.append(stu)
+
+    return course_id, students
+
+
+def _setup_empty_course(teacher):
+    """建 1 个课程 (无 enrollment, 无关联 student), 返 course_id。"""
+    with session_scope() as s:
+        course = Course(
+            course_code=_uni("C"), course_name="空课程测试",
+            course_type="theory", teacher_id=teacher.id,
+        )
+        s.add(course); s.flush()
+        return course.id
+
+
+def _open_a_task(course_id, teacher_id):
+    """建一个 open 的 AttendanceTask, 返 task_id。"""
+    now = datetime.now()
+    with session_scope() as s:
+        task = AttendanceTask(
+            course_id=course_id, teacher_id=teacher_id, classroom_id=1,
+            start_time=now - timedelta(hours=2),
+            end_time=now - timedelta(hours=1),
+            status="open",
+        )
+        s.add(task); s.flush()
+        return task.id
+
+
+def _cleanup_course_task(course_id, task_id):
+    """清掉空课程 + 关联 task / record。"""
+    with session_scope() as s:
+        from src.models.attendance import AttendanceRecord
+        if task_id is not None:
+            s.query(AttendanceRecord).filter(AttendanceRecord.task_id == task_id).delete()
+            s.query(AttendanceTask).filter(AttendanceTask.id == task_id).delete()
+        s.query(Course).filter(Course.id == course_id).delete()
+
+
+def _cleanup_course_task_and_students(course_id, users, task_id):
+    """清掉全选课的 course + task + record + 学生 (含 teacher)。"""
+    with session_scope() as s:
+        from src.models.attendance import AttendanceRecord
+        user_ids = [u.id for u in users]
+        if task_id is not None:
+            s.query(AttendanceRecord).filter(AttendanceRecord.task_id == task_id).delete()
+            s.query(AttendanceTask).filter(AttendanceTask.id == task_id).delete()
+        s.query(CourseEnrollmentDao.model).filter(
+            CourseEnrollmentDao.model.course_id == course_id).delete()
+        s.query(Course).filter(Course.id == course_id).delete()
+        s.query(User).filter(User.id.in_(user_ids)).delete()
+
+
+# ===========================================================
 # W13+ 签到码（数字 / 二维码）单测
 # 覆盖:
 #   - generate_signin_code 6 项

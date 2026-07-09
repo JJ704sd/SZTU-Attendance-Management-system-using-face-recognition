@@ -5,7 +5,9 @@ W4 Phase 4: 4 类报表图表（学生出勤率柱状 / 趋势折线 / 实验室
 
 设计要点:
 - 函数签名统一 (data, ax=None) -> Figure，ax=None 时建新 Figure
-- 输入是 src.services.report_service 的 dataclass（StudentRate 等）
+- 输入是 src.utils.report_dto 的 dataclass（StudentRate 等）
+  R16 修复: 之前从 src.services.report_service import → utils→services 反向依赖。
+  拆到 src.utils.report_dto 后, utils 之间互引 + services→utils 都合法, 4 层架构恢复单向。
 - 中文字体: 显式 rcParams['font.sans-serif'] = ['Microsoft YaHei UI']
   （CLAUDE.md 警告 Windows 上 matplotlib 中文不设字体必乱码）
 - 风格: 用 src.ui.styles.COLOR_* 全局色板
@@ -19,12 +21,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.figure import Figure
 
-from src.services.report_service import (
-    AbsentWarning,
-    LabUsagePoint,
-    StudentRate,
-    TrendPoint,
-)
 from src.ui.styles import (
     COLOR_BG,
     COLOR_BUTTON,
@@ -33,6 +29,12 @@ from src.ui.styles import (
     COLOR_SUCCESS,
     COLOR_WARNING,
     FONT_FAMILY,
+)
+from src.utils.report_dto import (
+    AbsentWarning,
+    LabUsagePoint,
+    StudentRate,
+    TrendPoint,
 )
 
 # 模块级 rcParams：进程内全局生效。

@@ -27,7 +27,7 @@
 - **W15+ UI 现代化**：5 主窗体 + 12 widget margin/spacing 加大 + design tokens（`RADIUS_*` / `SHADOW_*` / `FONT_SIZE_*` / `SPACING_*`），演示场景老人看着不累
 - **6 次审计修复**（W7-W15+ 共 36+ 真 bug）：死 import / 死方法 / 排序 tie-break / 测试污染 / bool Lock race / 资源泄漏 / 双摄像头冲突 / int-env 转换 / signin_web 闭包 token 校验 / H5 缓存
 - **PyInstaller onedir 380 MB 真一键 exe**：双击即跑，开发与交付同链路
-- **测试覆盖 193/193**：含 1 dtype 回归 + 1 collect_for_user 死循环回归 + 8 smoke 端到端（业务流 / 真脸 / QTest / 打包 / W13+ 签到 / W7-W12 历史修复回归 / W14+ 多端登录 9 步 / W14+ 打包后多端登录）+ 3 W15+ latest API 测试
+- **测试覆盖 219/219**：含 1 dtype 回归 + 1 collect_for_user 死循环回归 + 10 smoke 端到端（业务流 / 真脸 / QTest / 打包 / W13+ 签到 / W7-W12 历史修复回归 / W14+ 多端登录 9 步 / W14+ 打包后多端登录 / full_regression 6 service + 13 dao 全公开方法）+ 3 W15+ latest API 测试
 
 ## 快速上手
 
@@ -82,16 +82,18 @@ kill_all_python.bat   # 清干净再双击 start.bat
 ## 验收
 
 ```bash
-# 单元测试 (193 项 / ~60s 7 warning)
+# 单元测试 (219 项 / ~67s 3 warning)
 .venv\Scripts\python.exe -m pytest tests/ -q
 
-# 8 个 smoke 端到端脚本
+# 10 个 smoke 端到端脚本
 .venv\Scripts\python.exe scripts\smoke_full_flow.py        # 完整业务流 (W6)
 .venv\Scripts\python.exe scripts\smoke_real_face.py        # dlib 真脸 + 摄像头 (W6)
 .venv\Scripts\python.exe scripts\smoke_ui_qtest.py         # QTest 真实 UI (W6)
 .venv\Scripts\python.exe scripts\smoke_e2e.py              # 打包后端到端 (W5)
 .venv\Scripts\python.exe scripts\smoke_signin_methods.py   # W13+ 数字码 + 二维码
 .venv\Scripts\python.exe scripts\smoke_audit_history.py    # W7-W12 历史修复回归
+.venv\Scripts\python.exe scripts\smoke_full_regression.py  # 6 service + 13 dao 全公开方法
+.venv\Scripts\python.exe scripts\smoke_qrcode_build.py     # W14+ 防 hiddenimports 漏配 (二维码)
 .venv\Scripts\python.exe scripts\smoke_signin_web.py       # W14+ 9 步全链路
 .venv\Scripts\python.exe scripts\smoke_signin_web_build.py # W14+ 打包后多端登录
 
@@ -155,14 +157,14 @@ pyinstaller build.spec
 │   ├── main.py                ← 入口
 │   ├── config.py / db.py
 │   ├── models/                ← ORM 文件 (10 个, W14+ 加 course_teacher.py)
-│   ├── dao/                   ← 数据访问类 (12 个, 含 task_signin_code)
+│   ├── dao/                   ← 数据访问类 (15 个, 含 task_signin_code + course_teacher)
 │   ├── services/              ← 业务服务 (auth/face/attendance/lab/leave/report/signin_web 7 个)
-│   ├── ui/                    ← PyQt5 表现层 (5 主窗口 + 14 widget, W15+ UI 现代化)
-│   └── utils/                 ← 工具 (face_helper/crypto/charts/network/paths)
+│   ├── ui/                    ← PyQt5 表现层 (5 主窗口 + 13 widget, W15+ UI 现代化)
+│   └── utils/                 ← 工具 (face_helper/crypto/charts/network/paths/report_dto)
 │
-├── tests/                     ← 193 项单元测试 (27 个文件, 含 W15+ 3 项 latest API)
+├── tests/                     ← 219 项单元测试 (27 个文件, 含 W15+ 3 项 latest API)
 │
-├── scripts/                   ← 运维 + 8 个端到端 smoke + W14+ 工具
+├── scripts/                   ← 运维 + 10 个端到端 smoke + W14+ 工具
 │   ├── init_db.py / seed_demo_data.py / cleanup_test_users.py
 │   ├── build_2_zips.py / prepare_deliverable_zip.py ← W15+ 课程交付物打包
 │   ├── run_dev.sh / run_dev.bat              ← 全 ASCII + chcp 65001
@@ -202,7 +204,7 @@ pyinstaller build.spec
 
 ## 提交记录
 
-`git log --oneline` —— 共 **73 个 commit** (W2 → W15+, 14 周迭代 + 5 次 bug 审计 + W12 P0 验收 + W14 收尾 + W15+ 跨机可行性 4 P0 / 5 P1 修复)。
+`git log --oneline` —— 共 **main (94 commit) + R16 增 11 commit** (= audit-round16 HEAD, 公式化, `git rev-list HEAD --count` 实时数; W2 → audit-round16 HEAD, 14 周迭代 + 6 次 bug 审计 (W7/W8/W9/W10/W11/W12) + W14 收尾 + W15+ 跨机可行性 4 P0 / 5 P1 修复 + W16 docs/arch/UI 联审)。
 
 ## 已知约束（项目层面接受,不动）
 

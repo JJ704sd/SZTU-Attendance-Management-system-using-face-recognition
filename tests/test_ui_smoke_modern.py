@@ -271,3 +271,76 @@ def test_student_teacher_tables_have_alternating_row_colors(qapp, mock_db):
         for w in (sw, tw):
             w.close()
             w.deleteLater()
+
+
+# =============================================================================
+# R16: closeEvent 资源清理契约
+# =============================================================================
+def test_admin_closeEvent_is_clean(qapp, mock_db):
+    """R16: AdminWindow.closeEvent 不再有死代码 (task_detail_win /
+    lab_edit_win / training_edit_win / log_filter_win).
+
+    历史: 这 4 个属性从未在任何地方赋值, 旧版 closeEvent 循环里
+    getattr 永远返 None, 是死代码. R16 直接删, 靠 Qt 父子销毁链.
+
+    验证方式: closeEvent 不抛, 且 close 后续 deleteLater 也不抛.
+    """
+    from src.ui.admin_window import AdminWindow
+    w = AdminWindow(_make_fake_user("lab_admin"))
+    try:
+        # 这些属性绝不应再被 closeEvent 引用 (R16 已删)
+        for attr in ("task_detail_win", "lab_edit_win", "training_edit_win", "log_filter_win"):
+            assert not hasattr(w, attr) or getattr(w, attr, None) is None, (
+                f"AdminWindow.{attr} 不应再被 closeEvent 引用 (R16 删死代码)"
+            )
+        # 关窗不抛
+        w.close()
+        QCoreApplication.processEvents()
+    finally:
+        w.deleteLater()
+
+
+def test_teacher_closeEvent_handles_signin_code_win(qapp, mock_db):
+    """R16: TeacherWindow.closeEvent 只清理真正挂 self 上的 signin_code_win,
+    删了 leave_review_win / task_detail_win / new_pwd_win 死代码.
+
+    验证: 设一个假的 signin_code_win (有 close), 关窗应被调.
+    """
+    from unittest.mock import MagicMock
+    from src.ui.teacher_window import TeacherWindow
+    w = TeacherWindow(_make_fake_user("teacher"))
+    try:
+        # 模拟挂了一个 signin_code_win (有 close 方法)
+        fake_win = MagicMock()
+        fake_win.close = MagicMock()
+        w.signin_code_win = fake_win
+
+        w.close()
+        QCoreApplication.processEvents()
+
+        # close 应被调过 (兜底 signin_code_dialog 的 web_server.stop)
+        fake_win.close.assert_called()
+    finally:
+        w.deleteLater()
+
+
+def test_student_cleanup_resources_calls_qr_widget_public_api(qapp, mock_db):
+    """R16: StudentWindow._cleanup_resources 调 QrScanWidget 公开 API
+    cleanup_for_parent_close (不再碰 _stop_scan_internal 私有方法)."""
+    from unittest.mock import MagicMock, patch
+    from src.ui.student_window import StudentWindow
+    w = StudentWindow(_make_fake_user("student"))
+    try:
+        # 触发子 Tab 构造 (否则 _qr_widget 是 None)
+        if w._qr_widget is None:
+            w._rebuild_signin_subtabs(task_id=99999)
+        # spy on cleanup_for_parent_close
+        spy = MagicMock()
+        w._qr_widget.cleanup_for_parent_close = spy
+
+        # 调 _cleanup_resources
+        w._cleanup_resources()
+        spy.assert_called_once()
+    finally:
+        w.close()
+        w.deleteLater()

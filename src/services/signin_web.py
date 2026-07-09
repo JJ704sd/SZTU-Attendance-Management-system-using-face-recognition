@@ -26,8 +26,10 @@ from typing import Optional
 
 import uvicorn
 from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
+from pydantic import BaseModel, Field
 from sqlalchemy import and_
 
 from src.config import Config
@@ -44,6 +46,30 @@ log = logging.getLogger(__name__)
 
 # templates 路径: src/ui/web_templates/
 _TEMPLATES_DIR = Path(__file__).resolve().parent.parent / "ui" / "web_templates"
+
+
+# =====================================================
+# R16 修复: Pydantic 输入校验模型
+# =====================================================
+# 之前 api_signin 用 `payload: dict`, student_id/password/token
+# 长度完全无限制 (暴力灌入 1MB 字符串会触发 bcrypt 100ms 计算)。
+# 现在改用 Pydantic BaseModel + Field 约束, FastAPI 自动校验,
+# 422 会被 _validation_exception_handler 转成 400 BAD_REQUEST
+# (与前端约定的错误 schema 保持一致)。
+# =====================================================
+class SigninPayload(BaseModel):
+    """POST /api/signin 请求体校验.
+
+    字段约束 (R16 新增):
+      - student_id: 1-20 字符 (学号/username 实际长度上限 20)
+      - password:   1-100 字符 (bcrypt 限制 72 字节, 但允许 100 兼容未来)
+      - task_id:    正整数 (>=1)
+      - token:      8-64 字符 (跟 attendance_service.sign_in_by_qr 上限对齐)
+    """
+    student_id: str = Field(..., min_length=1, max_length=20)
+    password: str = Field(..., min_length=1, max_length=100)
+    task_id: int = Field(..., ge=1)
+    token: str = Field(..., min_length=8, max_length=64)
 
 
 # =====================================================
@@ -156,6 +182,27 @@ def build_signin_app(task_id: int, token: str, expires_at) -> FastAPI:
     app = FastAPI(title="签到服务", docs_url=None, redoc_url=None)
     templates = Jinja2Templates(directory=str(_TEMPLATES_DIR))
 
+    # R16 修复: Pydantic 校验失败 (422) → 转 400 BAD_REQUEST
+    # 原因: 前端 (H5 + 教师端) 统一用 {ok:false, error, msg} schema + 4xx 状态码
+    #       判定错误。FastAPI 默认返 422 + 不一致 schema, 会让前端误判。
+    # 同时也是安全加固: 不暴露 Pydantic 内部字段路径, 只说"参数不合法"。
+    @app.exception_handler(RequestValidationError)
+    async def _validation_exception_handler(request: Request, exc: RequestValidationError):
+        # 提取第一个错误信息 (避免泄露所有字段细节, 信息泄露面)
+        first_err = exc.errors()[0] if exc.errors() else {}
+        field = ".".join(str(p) for p in first_err.get("loc", []))
+        msg = first_err.get("msg", "参数不合法")
+        log.debug("Pydantic 校验失败: field=%s msg=%s", field, msg)
+        return _err("BAD_REQUEST", f"参数不合法: {field} {msg}".strip(), status=400)
+
+    # R16 修复: 全局兜底异常处理 — 不向客户端暴露 traceback / 内部堆栈
+    # 原因: FastAPI 默认对未捕获异常返 500 + 默认错误体, 在生产环境会泄露
+    #       代码路径、SQL 错误细节等。统一兜底返 INTERNAL + log.exception。
+    @app.exception_handler(Exception)
+    async def _unhandled_exception_handler(request: Request, exc: Exception):
+        log.exception("未捕获异常: path=%s err=%s", request.url.path, exc)
+        return _err("INTERNAL", "服务异常，请重试", status=500)
+
     # ----------------------------------------------------------
     # GET /signin/{tid}/{tok} — H5 签到页
     # ----------------------------------------------------------
@@ -185,12 +232,13 @@ def build_signin_app(task_id: int, token: str, expires_at) -> FastAPI:
                 expires_iso = expires_at.isoformat()
             except AttributeError:
                 expires_iso = str(expires_at)
-        return templates.TemplateResponse("signin.html", {
-            "request":     request,
-            "task_id":     task_id,
-            "token":       token,
-            "expires_iso": expires_iso,
-        })
+        return templates.TemplateResponse(
+            request, "signin.html", {
+                "task_id":     task_id,
+                "token":       token,
+                "expires_iso": expires_iso,
+            },
+        )
 
     # ----------------------------------------------------------
     # GET /api/signin/info?task={id} — 任务元信息 (给 H5 顶部展示)
@@ -235,8 +283,12 @@ def build_signin_app(task_id: int, token: str, expires_at) -> FastAPI:
     # POST /api/signin — 学生提交学号+密码+token
     # ----------------------------------------------------------
     @app.post("/api/signin")
-    async def api_signin(payload: dict):
+    async def api_signin(payload: SigninPayload):
         """Body: {task_id:int, token:str, student_id:str, password:str}
+
+        R16 修复: payload 用 Pydantic SigninPayload 校验 (长度/类型),
+                  缺字段或超长 → FastAPI 自动 422 → handler 转 400 BAD_REQUEST
+                  (前端契约不变)。
 
         流程:
           1. 校验请求参数完整性 + task_id 匹配
@@ -247,11 +299,11 @@ def build_signin_app(task_id: int, token: str, expires_at) -> FastAPI:
           5. attendance_service.sign_in_by_qr() — 复用 (写 signin_method='qr')
           6. 返回 {ok, status, student_name, sign_in_time}
         """
-        student_id = (payload.get("student_id") or "").strip()
-        password   = payload.get("password") or ""
-        tid        = payload.get("task_id")
-        tok        = payload.get("token") or ""
-        if not (student_id and password and isinstance(tid, int) and tok):
+        student_id = payload.student_id.strip()
+        password   = payload.password
+        tid        = payload.task_id
+        tok        = payload.token
+        if not student_id:  # Pydantic 已要求 min_length=1, 此处只防纯空白
             return _err("BAD_REQUEST", "请求参数不完整", status=400)
         if tid != task_id:
             return _err("CODE_INVALID", "签到码无效或已过期", status=400)
@@ -283,7 +335,7 @@ def build_signin_app(task_id: int, token: str, expires_at) -> FastAPI:
         # 3) sign_in_by_qr (复用)
         try:
             record = AttendanceService().sign_in_by_qr(
-                task_id, logged_user.id, token,
+                task_id, logged_user.id, tok,
             )
         except Exception as e:
             log.exception("sign_in_by_qr 异常: %s", e)

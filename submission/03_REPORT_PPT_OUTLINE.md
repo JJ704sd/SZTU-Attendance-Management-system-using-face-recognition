@@ -72,7 +72,7 @@
 
 ### 非功能需求
 - 响应 ≤ 2s | 准确率 ≥ 95% | 并发 ≥ 10 | 跨平台 Windows 10/11
-- 188 单元 + 8 smoke 测试
+- 219 单元 + 10 smoke 测试
 
 ---
 
@@ -83,13 +83,13 @@
 ```
 ┌────────────────────────────────────────┐
 │  UI 层 (src/ui/)                       │
-│  - 4 主窗口 + 14 widget                │
+│  - 5 主窗口 + 13 widget                │
 │  - PyQt5 5.15                          │
 └────────────────────────────────────────┘
               ↓ 调 service
 ┌────────────────────────────────────────┐
 │  Service 层 (src/services/)            │
-│  - 6 service: auth/attendance/face/    │
+│  - 7 service: auth/attendance/face/    │
 │    lab_access/leave/report (+signin_web)
 │  - 业务逻辑: 3 种签到统一 _create_record
 └────────────────────────────────────────┘
@@ -246,25 +246,27 @@ def check_access(student_id, lab_id):
 
 ## 第 10 页 — 测试与质量保证 (30s)
 
-### 188 单元测试 + 8 smoke 端到端
+### 219 单元测试 + 10 smoke 端到端
 
 | 类型 | 数量 | 通过率 |
 |---|---|---|
-| 单元测试 (pytest) | 188 | **188/188 ✓** |
-| 端到端 smoke | 8 | **8/8 ✓** |
-| 跑测时间 | ~55s | 0 业务 warning |
+| 单元测试 (pytest) | 219 | **219/219 ✓** |
+| 端到端 smoke | 10 | **10/10 ✓** |
+| 跑测时间 | ~60s | 0 业务 warning |
 
-### 8 个 smoke 脚本
+### 10 个 smoke 脚本
 1. `smoke_full_flow.py` — 完整业务流
 2. `smoke_real_face.py` — dlib 真脸端到端
 3. `smoke_ui_qtest.py` — QTest 真实 UI
 4. `smoke_e2e.py` — 打包后端到端
 5. `smoke_signin_methods.py` — 数字码 + 二维码签到
-6. `smoke_audit_history.py` — 5 次 bug 审计回归
-7. `smoke_signin_web.py` — W14 H5 多端签到
-8. `smoke_full_regression.py` — 6 service + 13 dao 全公开方法
+6. `smoke_audit_history.py` — 6 次 bug 审计回归
+7. `smoke_full_regression.py` — 6 service + 13 dao 全公开方法
+8. `smoke_qrcode_build.py` — W14+ 防 hiddenimports 漏配 (二维码)
+9. `smoke_signin_web.py` — W14 H5 多端签到
+10. `smoke_signin_web_build.py` — W14+ 打包后多端登录
 
-### 5 次 bug 审计 (W7-W12, 36 真 bug)
+### 6 次 bug 审计 (W7-W12, 36 真 bug)
 - W7: 9 死 import + 2 死方法 + 1 排序 tie-break + 1 测试污染
 - W8: closeEvent 资源泄漏 + 注册字段长度校验
 - W9: CameraWidget bool→Lock + face_collect 不 accept + 双摄像头冲突
@@ -287,7 +289,7 @@ def check_access(student_id, lab_id):
 ### 5 P1 (次修)
 - main.py 启动验 .env
 - TEAM_SETUP.md 加防火墙说明
-- TEAM_SETUP.md 数字同步 (188 / 14 表 / 8 smoke)
+- TEAM_SETUP.md 数字同步 (219 / 14 表 / 10 smoke)
 - signin_web 端口重试 5 次 (5180-5184)
 - signin_web watchdog 6 次 (30s 容错)
 
@@ -304,7 +306,7 @@ def check_access(student_id, lab_id):
 3. **跨机可行性 4 P0 修复**: 国内组员零环境也能跑, 阿里 DNS / gitee 镜像 fallback
 4. **face encoding 统一 np.float32**: 序列化/比对链路量纲一致
 5. **dlib-bin 预编译 wheel**: 避开 cmake 编译坑, Python 3.10+ 通吃
-6. **5 次 bug 审计 36 真 bug**: W7-W12 系统扫, commit 可追溯
+6. **6 次 bug 审计 36 真 bug**: W7-W12 系统扫, commit 可追溯
 
 ### 关键技术决策
 - dlib-bin==20.0.1 而非源码编译
@@ -319,13 +321,13 @@ def check_access(student_id, lab_id):
 ## 第 13 页 — 项目总结与展望 (20s)
 
 ### 完成度
-- ✅ **188 单元测试 + 8 smoke** 端到端全过
+- ✅ **219 单元测试 + 10 smoke** 端到端全过
 - ✅ **14 张表 + 19 FK + 3 UNIQUE** 数据完整
-- ✅ **6 service + 13 dao + 14 widget** 业务闭环
+- ✅ **7 service + 15 dao + 13 widget** 业务闭环
 - ✅ **W14 多端登录** 创新功能
 - ✅ **跨机可行性 4 P0 + 5 P1** 修复
 - ✅ **5 份 docs/** + **3 份 superpowers plans/** + **5 份 submission/** 文档完整
-- ✅ **76 commit** GitHub 完整迭代
+- ✅ **main (94 commit) + R16 增 11 commit** (audit-round16 HEAD, 公式化) GitHub 完整迭代
 
 ### 展望
 - 集成 GStreamer 摄像头 (Linux 兼容)
@@ -346,9 +348,9 @@ def check_access(student_id, lab_id):
 | "W14 H5 怎么实现？" | "FastAPI 嵌入 PyQt 进程, uvicorn + daemon 线程, 详细见 signin_web.py" |
 | "跨电脑能跑吗？" | "4 P0 + 5 P1 修复, 阿里 DNS, gitee 镜像, 防火墙文档, 详细见 TEAM_SETUP.md" |
 | "有没有 License 风险？" | "17 个第三方库全部 MIT/BSD/Apache, 无冲突, 详细见 02_ATTRIBUTION.md" |
-| "测试覆盖率？" | "188 单元 + 8 smoke, 95% 核心逻辑覆盖, 0 业务 warning" |
+| "测试覆盖率？" | "219 单元 + 10 smoke, 95% 核心逻辑覆盖, 0 业务 warning" |
 | "数据库设计亮点？" | "3 UNIQUE 约束, 19 FK, CASCADE, 详细见 06_DATABASE.md" |
-| "为什么用 PyQt5？" | "4 主窗口 + 14 widget 大量表格 + 表单, 控件丰富" |
+| "为什么用 PyQt5？" | "5 主窗口 + 13 widget 大量表格 + 表单, 控件丰富" |
 
 ---
 
@@ -356,7 +358,7 @@ def check_access(student_id, lab_id):
 
 1. **前 30s 抓眼球**: 直接说 "3 种签到方式 + W14 手机扫码 + 跨机零环境"
 2. **架构图 + 数据流图优先**: 评委看懂架构, 业务自己就懂
-3. **数字说话**: 188 单元 / 8 smoke / 14 张表 / 76 commit / 4 P0 修复
+3. **数字说话**: 219 单元 / 10 smoke / 14 张表 / main 94 + R16 增 11 / 4 P0 修复
 4. **避免长代码**: 关键逻辑用伪代码 + 流程图
 5. **Q&A 准备 8 个常见问题** (见上), 主动抛出
 
@@ -366,4 +368,4 @@ def check_access(student_id, lab_id):
 
 —— PPT 框架完毕, 共 14 页, 5 分钟陈述
 
-**排版建议**: 标题用 24-28pt 加粗, 正文 18-20pt, 关键数字 (188/8/14/76) 32pt 高亮
+**排版建议**: 标题用 24-28pt 加粗, 正文 18-20pt, 关键数字 (219/10/14 / 公式化 commit 数) 32pt 高亮

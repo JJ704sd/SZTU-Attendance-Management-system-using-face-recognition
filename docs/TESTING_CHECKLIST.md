@@ -17,9 +17,9 @@ net start mysql
 cd D:\Attendance-Management-system-using-face-recognition
 .\.venv\Scripts\Activate.ps1
 
-# 3. 验证 13 张表都在 (跨机适配 fix 已修, 应输出 13)
+# 3. 验证 14 张表都在 (跨机适配 fix 已修, 应输出 14)
 python -c "import sys; sys.path.insert(0, r'$(pwd)'); from src.db import init_db, Base; init_db(); print(f'建表数: {len(Base.metadata.tables)}')"
-# 期望: 建表数: 13
+# 期望: 建表数: 14
 ```
 
 ## 1. 启动 GUI (首次 5-10 分钟, 后续 2 秒)
@@ -30,7 +30,7 @@ python -m src.main
 ```
 
 **首次启动自动发生**:
-1. `init_db()` 建表 (13 张, 含 task_signin_code)
+1. `init_db()` 建表 (14 张, 含 task_signin_code + course_teacher)
 2. dlib 模型 120MB 下载 (首次, 断网会失败)
 3. 弹登录窗口
 
@@ -212,7 +212,7 @@ New-NetFirewallRule -DisplayName "AttendanceSigninWeb" -Direction Inbound -Local
 
 ```powershell
 pytest tests/ -q
-# 期望: 188 passed in ~55s, 7 warnings (websockets 库 deprecation, 跟我们无关)
+# 期望: 219 passed in ~67s, 3 warnings (fastapi/testclient + starlette + websockets 第三方库 deprecation)
 
 python scripts\smoke_signin_methods.py
 # 期望: [OK] smoke_signin_methods.py 通过
@@ -239,8 +239,8 @@ python scripts\smoke_full_regression.py
 
 ## 完整通过标志
 
-- [ ] pytest 188/188 全过
-- [ ] 7 个 smoke 端到端脚本全过
+- [ ] pytest 219/219 全过
+- [ ] 10 个 smoke 端到端脚本全过
 - [ ] 刷脸签到 1 条 (face)
 - [ ] 数字码签到 1 条 (digit, 60s 内)
 - [ ] 电脑摄像头二维码签到 1 条 (qr)

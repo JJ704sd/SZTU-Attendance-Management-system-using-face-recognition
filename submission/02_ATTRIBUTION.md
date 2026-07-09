@@ -13,7 +13,7 @@
 | API 模式参考官方文档 (SQLAlchemy/FastAPI/PyQt5/dlib) | ~5% |
 | 业务模式参考"对分易"等已知 App | ~5% |
 | 解决思路参考 stackoverflow / 博客 | ~5% |
-| **自研部分** (4 层架构 / 14 张表 / 6 service / 14 widget / 业务逻辑 / 测试 / W14 H5) | **~75%** |
+| **自研部分** (4 层架构 / 14 张表 / 7 service / 13 widget / 业务逻辑 / 测试 / W14 H5) | **~75%** |
 
 **总参考占比 ≈ 25%** ✓ (课程要求 ≤ 30%)
 
@@ -23,7 +23,7 @@
 
 | # | 库 | 版本 | License | 用途 | 项目内使用文件 |
 |---|---|---|---|---|---|
-| 1 | **PyQt5** | 5.15.x | GPL-3.0 | GUI 框架 (4 主窗口 + 14 widget) | `src/ui/*.py` |
+| 1 | **PyQt5** | 5.15.x | GPL-3.0 | GUI 框架 (5 主窗口 + 13 widget) | `src/ui/*.py` |
 | 2 | **SQLAlchemy** | 2.0.x | MIT | ORM (防 SQL 注入) | `src/dao/*.py` + `src/db.py` |
 | 3 | **PyMySQL** | 1.1.x | MIT | MySQL 驱动 | `src/db.py` |
 | 4 | **bcrypt** | 4.x | Apache-2.0 | 密码哈希 (替代明文) | `src/utils/crypto.py` |
@@ -39,7 +39,7 @@
 | 14 | **jinja2** | 3.x | BSD-3 | H5 签到页模板 | `src/services/signin_web.py` |
 | 15 | **httpx** | 0.27.x | BSD-3 | smoke 脚本的 HTTP 客户端 | `scripts/smoke_*.py` |
 | 16 | **PyInstaller** | 6.x | GPL-2.0 | onedir 打包 (380 MB) | `build.spec` |
-| 17 | **pytest** | 8.x | MIT | 单元测试 188 项 | `tests/test_*.py` |
+| 17 | **pytest** | 8.x | MIT | 单元测试 219 项 | `tests/test_*.py` |
 
 **所有 17 个库均通过 `pip install` 从 PyPI 安装, 全部开源 + 商用友好 License (MIT/BSD/Apache/PSF/HPND/Boost)**
 
@@ -137,15 +137,15 @@
 |---|---|---|
 | **4 层架构设计** (ui → service → dao → model) | ~200 | 100% |
 | **14 张表 schema** (db/schema.sql + 3 migration) | ~600 SQL | 100% |
-| **6 个 service 业务逻辑** (auth/attendance/face/lab/leave/report) | ~3000 | 100% |
+| **7 个 service 业务逻辑** (auth/attendance/face/lab/leave/report/signin_web) | ~3000 | 100% |
 | **13 个 DAO** (SQLAlchemy 2.0 ORM) | ~1500 | 100% |
 | **8 个 ORM model** (User/FaceEncoding/Course/...) | ~600 | 100% |
-| **4 主窗口 + 14 widget UI** (PyQt5) | ~5000 | 100% |
+| **5 主窗口 + 13 widget UI** (PyQt5) | ~5000 | 100% |
 | **W14 FastAPI 嵌入 + H5 签到页 + signin_web watchdog** | ~600 | 100% |
 | **3 种签到统一公共核 `_create_record`** | ~100 | 100% |
 | **跨机可行性 4 P0 修复** (init_db / import_schedule / Python 3.10+ / get_lan_ip) | ~150 | 100% |
-| **5 次 bug 审计 (W7-W12, 36 真 bug 修复)** | ~500 | 100% |
-| **188 单元测试 + 8 smoke 端到端** | ~3000 | 100% |
+| **6 次 bug 审计 (W7-W12, 36 真 bug 修复 + W16 docs/arch/UI 联审)** | ~500 | 100% |
+| **219 单元测试 + 10 smoke 端到端** | ~3000 | 100% |
 | **5 份文档** (PROJECT_PLAN / ARCHITECTURE / STRUCTURE / DEVELOPMENT / DATABASE) | ~3000 | 100% |
 
 ### 4.2 部分自研 (参考 API 模式, 业务逻辑自写)
@@ -205,6 +205,6 @@ pytest        : MIT              (商用友好)
 - **仓库地址**: https://github.com/JJ704sd/SZTU-Attendance-Management-system-using-face-recognition
 - **本声明版本**: v1.0, 2026-06-17
 - **配套提交物**: `<组长学号>_智能考勤与实验室准入系统_设计方案.zip`
-- **课程验收时**, 老师可对照本声明 + 仓库 76 个 commit 完整追溯
+- **课程验收时**, 老师可对照本声明 + 仓库 main (94 commit) + R16 增 11 commit (audit-round16 HEAD, 公式化) 完整追溯
 
 —— 参考声明完毕
