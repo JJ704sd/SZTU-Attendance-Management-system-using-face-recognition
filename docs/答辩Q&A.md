@@ -1007,7 +1007,7 @@ SQLAlchemy:`s.execute(text("INSERT INTO ..."), params)`。**代价**:失去 ORM 
 - [ ] 测试账号:`test001/123456`(学生)、`teacher001/123456`(教师)
 - [ ] `pytest tests/ -v` 最后一行是 "219 passed"(**PPT 写 136 是错的,实际 219**)
 - [ ] 答辩 PPT 9 页打开,投影正常
-- [ ] 准备好 `git log --oneline | head -20`(展示 105 个 commit)
+- [ ] 准备好 `git log --oneline | head -20`(展示 main 94 + R16 增 11 共 105, 或 `git rev-list HEAD --count` 实时数)
 - [ ] 准备好 `db/schema.sql` 全文(老师可能让你指出某张表)
 - [ ] 准备好 `src/services/attendance_service.py::_create_record` 代码(签到核心,Q4/Q10 高频)
 - [ ] 准备好 `attendance_record` 表结构和 UNIQUE 索引(Q4 高频)

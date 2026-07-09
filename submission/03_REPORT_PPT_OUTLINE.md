@@ -327,7 +327,7 @@ def check_access(student_id, lab_id):
 - ✅ **W14 多端登录** 创新功能
 - ✅ **跨机可行性 4 P0 + 5 P1** 修复
 - ✅ **5 份 docs/** + **3 份 superpowers plans/** + **5 份 submission/** 文档完整
-- ✅ **105 commit (audit-round16 HEAD)** GitHub 完整迭代
+- ✅ **main (94 commit) + R16 增 11 commit** (audit-round16 HEAD, 公式化) GitHub 完整迭代
 
 ### 展望
 - 集成 GStreamer 摄像头 (Linux 兼容)
@@ -358,7 +358,7 @@ def check_access(student_id, lab_id):
 
 1. **前 30s 抓眼球**: 直接说 "3 种签到方式 + W14 手机扫码 + 跨机零环境"
 2. **架构图 + 数据流图优先**: 评委看懂架构, 业务自己就懂
-3. **数字说话**: 219 单元 / 10 smoke / 14 张表 / 105 commit / 4 P0 修复
+3. **数字说话**: 219 单元 / 10 smoke / 14 张表 / main 94 + R16 增 11 / 4 P0 修复
 4. **避免长代码**: 关键逻辑用伪代码 + 流程图
 5. **Q&A 准备 8 个常见问题** (见上), 主动抛出
 
@@ -368,4 +368,4 @@ def check_access(student_id, lab_id):
 
 —— PPT 框架完毕, 共 14 页, 5 分钟陈述
 
-**排版建议**: 标题用 24-28pt 加粗, 正文 18-20pt, 关键数字 (219/10/14/105) 32pt 高亮
+**排版建议**: 标题用 24-28pt 加粗, 正文 18-20pt, 关键数字 (219/10/14 / 公式化 commit 数) 32pt 高亮

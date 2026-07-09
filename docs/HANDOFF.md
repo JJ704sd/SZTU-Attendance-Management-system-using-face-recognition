@@ -20,7 +20,7 @@
 | **打包** | PyInstaller onedir **~380 MB** |
 | **3 种签到** | 刷脸 (dlib 距离匹配) / 数字码 (对分易式 60s 倒计时) / 二维码 (base64 token) |
 | **W14+ 新功能** | FastAPI 嵌入 + H5 签到页 (手机扫码 → 浏览器 → 教师端实时反馈) |
-| **迭代** | W2 → W15+, 共 14 周, **105 commit** (audit-round16 HEAD), 6 次 bug 审计 (W7/W8/W9/W10/W11/W12) + W14 收尾 + W15+ 跨机可行性体检 |
+| **迭代** | W2 → W15+, 共 14 周, **main (94 commit) + R16 增 11 commit** (= audit-round16 HEAD, 公式化表述, 永远正确, 详见 `git log --oneline` 实时数), 6 次 bug 审计 (W7/W8/W9/W10/W11/W12) + W14 收尾 + W15+ 跨机可行性体检 |
 
 ## 2. 你应该读哪一篇？
 
@@ -170,7 +170,7 @@ python -m src.main
 
 | 指标 | 数据 |
 |---|---|
-| Git commit 数 | **105** (W2 → audit-round16 HEAD, 含 6 次 bug 审计 + W12 P0 + W14 收尾 + W15+ 跨机可行性 + W16 docs/arch/UI 联审) |
+| Git commit 数 | **main (94 commit) + R16 增 11 commit** (= audit-round16 HEAD, 公式化, `git rev-list HEAD --count` 实时数; 含 6 次 bug 审计 + W12 P0 + W14 收尾 + W15+ 跨机可行性 + W16 docs/arch/UI 联审) |
 | 入库文件数 | **149** (110 .py + 29 .md + 3 .sql + 4 .bat/.spec + 3 submission) |
 | 入库代码大小 | ~970 KB (压缩后 ~400 KB) |
 | 测试覆盖 | **219 单元 / 10 smoke 端到端 / 3 warning**（fastapi/testclient + starlette + websockets 第三方库 deprecation） |
