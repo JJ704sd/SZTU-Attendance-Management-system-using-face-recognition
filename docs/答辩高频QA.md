@@ -15,7 +15,7 @@
 | 签到方式 | **3 种** | 刷脸(face)/ 数字码(digit)/ 二维码(qr),共用 `_create_record` 公共核 |
 | 实验室判定分支 | **7 种** | 6 拒绝 + 1 放行;`safety_level >= 4` 算高等级(**PPT 写"5 级"是简化**) |
 | 迭代阶段 | **5 个** | V1.0 登录 → V2.0 人脸 → V3.0 准入 → V4.0 打包 → V5.0 签到方式 |
-| Git commit | **101+** (audit-round16 HEAD) | `git log --oneline \| head -20` 可现场展示 |
+| Git commit | **105** (audit-round16 HEAD) | `git log --oneline \| head -20` 可现场展示 |
 | PyInstaller 打包 | **380 MB** | onedir 模式,含 dlib 模型,双击即跑 |
 | 签到码 TTL | 默认 60s / **最长 600s(10 分钟)** | **PPT 写 300s 是错的**,代码 `attendance_service.py:42` |
 | bcrypt rounds | **12** | 每次哈希 ~250ms |

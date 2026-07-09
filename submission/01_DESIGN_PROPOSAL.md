@@ -429,7 +429,7 @@ def _create_record(self, task_id, user_id, signin_method, match_score=None):
 
 `https://github.com/JJ704sd/SZTU-Attendance-Management-system-using-face-recognition`
 
-- 101 commit (audit-round16 HEAD) / 149 文件 / 988.6 KB
+- 105 commit (audit-round16 HEAD) / 149 文件 / 988.6 KB
 - main 分支
 - 含完整迭代历史 (W2-W15+, 14 周 + W16 R16 联审)
 
@@ -480,7 +480,7 @@ def _create_record(self, task_id, user_id, signin_method, match_score=None):
 - 第三方库使用 + API 参考 ≤ 25% (< 30% 限制)
 - 219 单元 + 10 smoke 测试全过
 - 跨机可行性 4 P0 修复, 组员零环境也能跑
-- 完整 14 周迭代, 6 次 bug 审计, 101 commit (audit-round16 HEAD)
+- 完整 14 周迭代, 6 次 bug 审计, 105 commit (audit-round16 HEAD)
 - 所有 commit / blame 可追溯
 
 **项目交付完毕, 等待课程验收。**

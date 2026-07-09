@@ -204,7 +204,7 @@ pyinstaller build.spec
 
 ## 提交记录
 
-`git log --oneline` —— 共 **101 个 commit** (W2 → audit-round16 HEAD, 14 周迭代 + 6 次 bug 审计 (W7/W8/W9/W10/W11/W12) + W14 收尾 + W15+ 跨机可行性 4 P0 / 5 P1 修复 + W16 docs/arch/UI 联审)。
+`git log --oneline` —— 共 **105 个 commit** (W2 → audit-round16 HEAD, 14 周迭代 + 6 次 bug 审计 (W7/W8/W9/W10/W11/W12) + W14 收尾 + W15+ 跨机可行性 4 P0 / 5 P1 修复 + W16 docs/arch/UI 联审)。
 
 ## 已知约束（项目层面接受,不动）
 

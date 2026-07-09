@@ -220,7 +220,7 @@
 - **Git 仓库**: `https://github.com/JJ704sd/SZTU-Attendance-Management-system-using-face-recognition`
 - **分支策略**: 全员 main 分支直接推 (小组 4-5 人, 不需要 feature branch)
 - **commit 规范**: `<type>(<scope>): <subject>`, type = feat/fix/docs/test/refactor
-- **101 commit (audit-round16 HEAD)** 已推, 完整迭代
+- **105 commit (audit-round16 HEAD)** 已推, 完整迭代
 
 ### 5.2 会议节奏
 - **每周例会**: 周日 21:00 (线上腾讯会议), 1h, 同步进度 + 分配下周任务
@@ -338,7 +338,7 @@
 
 ---
 
-—— 组员分工表完毕, 4-5 人, 14 周, 101 commit (audit-round16 HEAD), 5 份 submission 文档
+—— 组员分工表完毕, 4-5 人, 14 周, 105 commit (audit-round16 HEAD), 5 份 submission 文档
 
 **本表配套材料**:
 - `submission/01_DESIGN_PROPOSAL.md` (整体设计)

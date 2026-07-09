@@ -205,6 +205,6 @@ pytest        : MIT              (商用友好)
 - **仓库地址**: https://github.com/JJ704sd/SZTU-Attendance-Management-system-using-face-recognition
 - **本声明版本**: v1.0, 2026-06-17
 - **配套提交物**: `<组长学号>_智能考勤与实验室准入系统_设计方案.zip`
-- **课程验收时**, 老师可对照本声明 + 仓库 101 个 commit (audit-round16 HEAD) 完整追溯
+- **课程验收时**, 老师可对照本声明 + 仓库 105 个 commit (audit-round16 HEAD) 完整追溯
 
 —— 参考声明完毕

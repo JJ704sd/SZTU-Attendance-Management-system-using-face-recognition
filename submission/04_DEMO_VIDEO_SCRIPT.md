@@ -325,7 +325,7 @@ $ python scripts/smoke_full_flow.py
 ```
 [画面: 浏览器打开 GitHub 仓库]
 
-旁白: "完整项目在 GitHub 上, 101 个 commit (audit-round16 HEAD), 149 文件, 988.6 KB,
+旁白: "完整项目在 GitHub 上, 105 个 commit (audit-round16 HEAD), 149 文件, 988.6 KB,
       完整迭代 14 周 (W2-W15+)。"
 
 [操作: 切到 GitHub 仓库, 展示 commit 列表]
@@ -450,7 +450,7 @@ W14 多端登录 —— 手机扫码 H5 签到, FastAPI 嵌入 PyQt 进程, 教�
 
 10
 00:05:30,000 --> 00:06:00,000
-GitHub 101 commit (audit-round16 HEAD) 完整迭代, 6 次 bug 审计 36 真 bug。
+GitHub 105 commit (audit-round16 HEAD) 完整迭代, 6 次 bug 审计 36 真 bug。
 ```
 
 ---
