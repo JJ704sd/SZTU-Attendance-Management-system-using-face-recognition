@@ -93,10 +93,15 @@ src/
 - **Windows + PyQt5 + offscreen + QMessageBox 会段错误**——别在 offscreen 模式下触发按钮，直接带显示器跑
 - **dlib 模型 120 MB**——首次 `python -m src.main` 会自动下载，断网会失败
 - **`.env` 含明文密码**，不入 git；修改后重启服务生效
-- **GitHub 推送需要绕开代理**——全局 `.gitconfig` 配了 `http.proxy=http://127.0.0.1:17891`，会阻断 GitHub HTTPS。命令级加 `-c http.proxy= -c https.proxy=` 即可：
+- **GitHub 推送走代理（不需要绕开）**——全局 `.gitconfig` 配 `http.proxy=http://127.0.0.1:17891` 能通 GitHub HTTPS，**不要**加 `-c http.proxy=` 绕开。**经验**：Windows PowerShell 5.1 schannel 对 GitHub 偶发 SSL handshake 抖动（`Recv failure: Connection was reset` / `schannel: failed to receive handshake`）。**SOP**：
   ```bash
-  git -c http.proxy= -c https.proxy= push -u origin main
+  # 探活 + 等 30s 缓冲
+  Start-Sleep -Seconds 30
+  git ls-remote origin main  # 通了再 push
+
+  git push origin main  # bash timeout 设 ≥ 300000ms（默认 180s 不够）
   ```
+  真要稳定建议换 SSH（避免 schannel）。
 - **课程要求 PDF** `2025-2026-2+数据库原理+课程设计要求.pdf` 仍在项目根目录的磁盘上（是学校发的参考资料），但**已从 git 撤库**（commit `f956163`），`.gitignore` 里 `*.pdf` 规则会拦住
 - **W15+ 多 GUI 进程抢资源**——`start.bat` 启的 `.venv` GUI 没关 + 又用 PowerShell/system Python 启一个 → 两个 python 进程都跑，5180 端口冲突 + SQLAlchemy 连接池独立。**修法**：跑 `kill_all_python.bat`（全 ASCII）一次清干净 + 双击 `start.bat` 重启。**永远 "kill all + start one"**
 - **W15+ `.bat` 必须全 ASCII**——cmd 5.1 默认 GBK 编码，UTF-8 写的中文注释里的英文 token（如 `cmd.exe` / `python.exe`）被 cmd 当命令执行 → "不是内部或外部命令"。**修法**：`.bat` 删所有中文注释，全 ASCII；顶部加 `chcp 65001 >nul` 防输出乱码；echo 内容避免 `()` 圆括号（cmd 5.1 解析成 nested block）

@@ -212,7 +212,7 @@ New-NetFirewallRule -DisplayName "AttendanceSigninWeb" -Direction Inbound -Local
 
 ```powershell
 pytest tests/ -q
-# 期望: 219 passed in ~67s, 3 warnings (fastapi/testclient + starlette + websockets 第三方库 deprecation)
+# 期望: 219 passed in ~67s, 2 warnings (uvicorn 内部 websockets.legacy + WebSocketServerProtocol 第三方依赖 deprecation, 非本项目代码)
 
 python scripts\smoke_signin_methods.py
 # 期望: [OK] smoke_signin_methods.py 通过

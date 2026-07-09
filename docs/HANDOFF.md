@@ -16,7 +16,7 @@
 | **架构** | 4 层 (ui → service → dao → model) + utils |
 | **数据** | **14 张表** (schema.sql 12 + migration_w13.sql 1 + migration_w14.sql 1) |
 | **代码** | **110 个 .py** (66 src + 27 tests + 17 scripts) / 7 service / 13 widget / 5 主窗口 |
-| **测试** | **219 单元 / 10 smoke 端到端**（全过 ~67s 3 warning — 1 fastapi/testclient + 1 starlette + 1 websockets 第三方库 deprecation） |
+| **测试** | **219 单元 / 10 smoke 端到端**（全过 ~67s 2 warning — uvicorn 内部 websockets.legacy + WebSocketServerProtocol 第三方依赖 deprecation，非本项目代码） |
 | **打包** | PyInstaller onedir **~380 MB** |
 | **3 种签到** | 刷脸 (dlib 距离匹配) / 数字码 (对分易式 60s 倒计时) / 二维码 (base64 token) |
 | **W14+ 新功能** | FastAPI 嵌入 + H5 签到页 (手机扫码 → 浏览器 → 教师端实时反馈) |
@@ -162,7 +162,7 @@ python -m src.main
 | 6 | **二维码签到**: 教师弹码 → 学生扫 → 出勤 | attendance_record 多一行 signin_method='qr' | ☐ |
 | 7 | **手机扫码 H5**: 教师点"二维码签到" → 手机浏览器打开 H5 → 提交 | attendance_record 多一行 signin_method='qr' (从手机来) | ☐ |
 | 8 | **关闭任务**: 教师点"结束选中任务" | 没签到的学生自动 absent, 请过假的变 leave | ☐ |
-| 9 | **自动化测试**: `pytest tests/ -q` | 219 passed in ~67s 3 warning | ☐ |
+| 9 | **自动化测试**: `pytest tests/ -q` | 219 passed in ~67s 2 warning (uvicorn 内部) | ☐ |
 
 详细手机扫码步骤 + 防火墙授权 + 故障排除见 [docs/TESTING_CHECKLIST.md](TESTING_CHECKLIST.md)。
 
@@ -173,7 +173,7 @@ python -m src.main
 | Git commit 数 | **main (94 commit) + R16 增 11 commit** (= audit-round16 HEAD, 公式化, `git rev-list HEAD --count` 实时数; 含 6 次 bug 审计 + W12 P0 + W14 收尾 + W15+ 跨机可行性 + W16 docs/arch/UI 联审) |
 | 入库文件数 | **149** (110 .py + 29 .md + 3 .sql + 4 .bat/.spec + 3 submission) |
 | 入库代码大小 | ~970 KB (压缩后 ~400 KB) |
-| 测试覆盖 | **219 单元 / 10 smoke 端到端 / 3 warning**（fastapi/testclient + starlette + websockets 第三方库 deprecation） |
+| 测试覆盖 | **219 单元 / 10 smoke 端到端 / 2 warning**（uvicorn 内部 websockets.legacy + WebSocketServerProtocol 第三方依赖 deprecation，非本项目代码） |
 | 迭代周数 | 14 周 (W2 / W3 / W4 / W5 / W6 / W7 / W8 / W9 / W10 / W11 / W12 / W13+ / W14 / W15+) |
 | Bug 审计次数 | **6 次** (W7/W8/W9/W10/W11/W12) + W14 收尾 + W15+ 跨机可行性 + W16 docs/arch/UI 联审 |
 | 跨机可行性 P0 数 | 0 (4 修 + 5 P1 修 + 3 改进) |
